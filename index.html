@@ -3,122 +3,155 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-<title>Vuruş Testi</title>
+<title>Vuruş</title>
 <style>
-  :root { --bg:#101214; --panel:#1b1f23; --line:#2c3238; --ink:#f2f4f5; --dim:#9aa4ad; --hit:#ffb020; --ok:#3ddc97; --bad:#ff6b6b; }
-  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  html,body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.4 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif; overscroll-behavior:none; }
-  main { max-width:520px; margin:0 auto; padding:16px 16px 48px; }
-  h1 { font-size:20px; margin:4px 0 2px; }
-  .sub { color:var(--dim); font-size:14px; margin:0 0 14px; }
-  button { font:inherit; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 12px; min-height:52px; cursor:pointer; touch-action:manipulation; }
-  button:active { transform:scale(.98); }
-  #start { width:100%; background:var(--hit); color:#111; border:0; font-size:22px; font-weight:700; min-height:72px; }
-  #start.on { background:var(--panel); color:var(--ok); border:1px solid var(--ok); }
-  #pad { margin:16px auto; width:220px; height:220px; border-radius:50%; border:3px solid var(--line); display:flex; flex-direction:column; align-items:center; justify-content:center; transition:background .25s, border-color .25s; }
-  #pad.flash { background:var(--hit); border-color:var(--hit); transition:none; }
-  #pad.flash * { color:#111; }
-  #count { font-size:72px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
-  #last { color:var(--dim); font-size:14px; margin-top:6px; }
-  #meter { height:10px; background:var(--panel); border-radius:5px; overflow:hidden; position:relative; }
-  #bar { height:100%; width:0; background:var(--ok); }
-  #tick { position:absolute; top:0; bottom:0; width:2px; background:var(--hit); }
-  h2 { font-size:14px; color:var(--dim); font-weight:600; margin:22px 0 8px; text-transform:uppercase; letter-spacing:.04em; }
-  .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
-  .grid2 { display:grid; grid-template-columns:repeat(2,1fr); gap:8px; }
-  .sel { border-color:var(--hit); color:var(--hit); font-weight:700; }
-  .row { display:flex; align-items:center; gap:12px; }
-  input[type=range] { flex:1; height:36px; accent-color:var(--hit); }
-  #thv { min-width:54px; text-align:right; font-variant-numeric:tabular-nums; }
-  dl { margin:0; display:grid; grid-template-columns:1fr auto; gap:6px 12px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; font-size:14px; }
-  dt { color:var(--dim); } dd { margin:0; font-variant-numeric:tabular-nums; text-align:right; }
-  #msg { margin:12px 0 0; padding:10px 12px; border-radius:10px; font-size:14px; display:none; }
-  #msg.show { display:block; background:#3a2020; color:var(--bad); }
-  #msg.show.good { background:#17342a; color:var(--ok); }
-  textarea { width:100%; min-height:110px; margin-top:8px; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:8px; font:12px/1.4 ui-monospace,monospace; display:none; }
-  #lock { position:fixed; inset:0; background:rgba(8,9,10,.94); display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:24px; z-index:9; user-select:none; -webkit-user-select:none; }
-  #lock.show { display:flex; }
-  #lockCount { font-size:120px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
-  #lock.flash { background:var(--hit); } #lock.flash * { color:#111; }
-  #lockHint { color:var(--dim); margin-top:18px; }
-  ol { padding-left:20px; color:var(--dim); font-size:14px; } ol li { margin:4px 0; }
+:root{--bg:#0f1113;--panel:#1a1e22;--line:#2b3137;--ink:#f2f4f5;--dim:#98a2ab;--hit:#ffb020;--ok:#3ddc97;--bad:#ff6b6b}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none}
+main{max-width:520px;margin:0 auto;padding:14px 14px 96px}
+header{display:flex;align-items:baseline;gap:8px;margin-bottom:10px}
+h1{font-size:22px;margin:0}
+#ver{color:var(--dim);font-size:13px}
+h2{font-size:13px;color:var(--dim);font-weight:600;margin:20px 0 8px;text-transform:uppercase;letter-spacing:.04em}
+h3{font-size:18px;margin:0 0 10px}
+button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 10px;min-height:50px;cursor:pointer;touch-action:manipulation}
+button:active{transform:scale(.98)}
+button.sel{border-color:var(--hit);color:var(--hit);font-weight:700}
+button.wide{width:100%;margin-top:12px}
+button.primary{background:var(--hit);color:#111;border:0;font-weight:700}
+button:disabled{opacity:.4}
+#start{width:100%;background:var(--hit);color:#111;border:0;font-size:22px;font-weight:700;min-height:68px}
+#start.on{background:var(--panel);color:var(--ok);border:1px solid var(--ok);font-size:16px;min-height:44px}
+#msg{margin:10px 0 0;padding:10px 12px;border-radius:10px;font-size:14px;display:none}
+#msg.show{display:block;background:#3a2020;color:var(--bad)}
+#msg.show.good{background:#17342a;color:var(--ok)}
+.view{display:none}.view.on{display:block}
+#pad{margin:16px auto 12px;width:230px;height:230px;border-radius:50%;border:3px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;transition:background .25s,border-color .25s}
+#pad.flash{background:var(--hit);border-color:var(--hit);transition:none}
+#pad.flash.bad{background:var(--bad);border-color:var(--bad)}
+#pad.flash *{color:#111}
+#big{font-size:34px;font-weight:800;line-height:1.1}
+#count{font-size:54px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+#sub{color:var(--dim);font-size:13px;padding:0 18px}
+#meter{height:8px;background:var(--panel);border-radius:4px;overflow:hidden;position:relative}
+#bar{height:100%;width:0;background:var(--ok)}
+#tick{position:absolute;top:0;bottom:0;width:2px;background:var(--hit)}
+.g2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.row{display:flex;align-items:center;gap:12px}
+input[type=range]{flex:1;height:36px;accent-color:var(--hit)}
+.val{min-width:64px;text-align:right;font-variant-numeric:tabular-nums}
+.note{color:var(--dim);font-size:14px;margin:10px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0}
+.lesson{display:flex;align-items:center;justify-content:space-between;width:100%;margin:8px 0;text-align:left}
+.lesson small{color:var(--dim)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.chip{padding:8px 10px;border-radius:999px;border:1px solid var(--line);font-size:14px}
+.chip.cur{border-color:var(--hit);color:var(--hit);font-weight:700}
+.chip.ok{border-color:var(--ok);color:var(--ok)}
+.chip.no{border-color:var(--bad);color:var(--bad)}
+dl{margin:0;display:grid;grid-template-columns:1fr auto;gap:6px 12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:14px}
+dt{color:var(--dim)}dd{margin:0;font-variant-numeric:tabular-nums;text-align:right}
+textarea{width:100%;min-height:120px;margin-top:8px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px;font:12px/1.4 ui-monospace,monospace;display:none}
+ol{padding-left:20px;color:var(--dim);font-size:14px}ol li{margin:4px 0}
+nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,1fr);background:#14171a;border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
+nav button{border:0;background:none;color:var(--dim);min-height:48px;border-radius:10px}
+nav button.on{color:var(--hit);font-weight:700;background:var(--panel)}
+#lock{position:fixed;inset:0;background:rgba(8,9,10,.95);display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;z-index:9;user-select:none;-webkit-user-select:none}
+#lock.show{display:flex}
+#lock.flash{background:var(--hit)}#lock.flash.bad{background:var(--bad)}#lock.flash *{color:#111}
+#lockBig{font-size:64px;font-weight:800;line-height:1.05}
+#lockSub{font-size:22px;margin-top:10px;color:var(--dim)}
+#lockHint{color:var(--dim);margin-top:26px;font-size:14px}
 </style>
 </head>
 <body>
 <main>
-  <h1>Vuruş Testi</h1>
-  <p class="sub">Telefon bilekte. Her vuruş bir ses çıkarır.</p>
-
+  <header><h1>Vuruş</h1><span id="ver">v0.2</span></header>
   <button id="start">BAŞLAT</button>
   <div id="msg"></div>
 
-  <div id="pad"><div id="count">0</div><div id="last">henüz vuruş yok</div></div>
-  <div id="meter"><div id="bar"></div><div id="tick"></div></div>
+  <section class="view on" id="v-play">
+    <div id="pad"><div id="big">–</div><div id="count">0</div><div id="sub">başlamak için BAŞLAT'a bas</div></div>
+    <div id="meter"><div id="bar"></div><div id="tick"></div></div>
+    <p class="note" id="hint"></p>
+    <h2>Bu telefon hangi elde</h2>
+    <div class="g2" id="hands"><button data-v="L">Sol el</button><button data-v="R">Sağ el</button></div>
+    <h2>Ses paketi</h2>
+    <div class="g3" id="packs"></div>
+    <h2>Eşlik ritmi</h2>
+    <div class="row"><button id="beatBtn">Kapalı</button><input id="bpm" type="range" min="70" max="150" step="5"><span class="val" id="bpmv"></span></div>
+    <button id="lockBtn" class="wide">Ekranı kilitle</button>
+  </section>
 
-  <h2>Ses</h2>
-  <div class="grid" id="sounds"></div>
+  <section class="view" id="v-lessons">
+    <p class="note">Her ders bir kombinasyon. Sırayı dört tur at. Yüzde 80 doğruyla sonraki ders açılır. Eşlik ritmi açıksa ritme uyumun da ölçülür.</p>
+    <div id="lessonList"></div>
+    <div id="lessonRun" class="card" hidden>
+      <h3 id="lName"></h3>
+      <div class="chips" id="chips"></div>
+      <div class="note" id="lStat"></div>
+      <button id="lStop" class="wide">Dersi bitir</button>
+    </div>
+  </section>
 
-  <h2>Hassasiyet</h2>
-  <div class="row"><input id="th" type="range" min="8" max="60" step="1" value="20"><span id="thv">20</span></div>
-  <p class="sub" style="margin:4px 0 0">Gard hareketi ses çıkarıyorsa sayıyı büyüt. Yumruk algılanmıyorsa küçült.</p>
+  <section class="view" id="v-teach">
+    <p class="note">Sistem senin yumruklarını öğrenir. Sırayla direkt, kroşe ve aparkatı sekizer kez at. Her yakalanan yumrukta kısa bir bip duyarsın, tip değişirken sesli uyarı gelir.</p>
+    <div class="card" id="calStatus"></div>
+    <button id="calStart" class="wide primary">Öğretmeye başla</button>
+    <div class="note" id="calResult"></div>
+    <button id="calClear" class="wide">Öğrenileni sil</button>
+  </section>
 
-  <h2>Ses ne zaman çalsın</h2>
-  <div class="grid2" id="modes">
-    <button data-mode="end" class="sel">Vuruşun sonunda</button>
-    <button data-mode="start">Başında (deneysel)</button>
-  </div>
-
-  <h2>Ölçümler</h2>
-  <dl>
-    <dt>Sensör örnek aralığı</dt><dd id="dInt">–</dd>
-    <dt>Ses çıkış gecikmesi</dt><dd id="dOut">–</dd>
-    <dt>Tahmini toplam gecikme</dt><dd id="dTot">–</dd>
-    <dt>Sensör kaynağı</dt><dd id="dSrc">–</dd>
-  </dl>
-
-  <h2>İşlemler</h2>
-  <div class="grid2">
-    <button id="test">Test sesi</button>
-    <button id="reset">Sayacı sıfırla</button>
-    <button id="copy">Sonucu kopyala</button>
-    <button id="lockBtn">Ekranı kilitle</button>
-  </div>
-  <textarea id="out" readonly></textarea>
-
-  <h2>Kullanım</h2>
-  <ol>
-    <li>Telefonun sessiz modunu kapat, sesi aç. Bluetooth hoparlör kullanma, sesi geciktirir.</li>
-    <li>BAŞLAT'a bas, hareket iznine "İzin Ver" de.</li>
-    <li>Bir ses seç, "Ekranı kilitle"ye bas, telefonu bileğe sabitle.</li>
-    <li>Sadece gölge boksu yap. Telefon bilekteyken torbaya ya da bir şeye vurma.</li>
-  </ol>
+  <section class="view" id="v-set">
+    <h2>Hassasiyet</h2>
+    <div class="row"><input id="th" type="range" min="8" max="60" step="1"><span class="val" id="thv"></span></div>
+    <p class="note">Gard hareketi ses çıkarıyorsa sayıyı büyüt. Yumruk algılanmıyorsa küçült.</p>
+    <h2>Ölçümler</h2>
+    <dl>
+      <dt>Sensör örnek aralığı</dt><dd id="dInt">–</dd>
+      <dt>Ses çıkış gecikmesi</dt><dd id="dOut">–</dd>
+      <dt>Jiroskop</dt><dd id="dGyro">–</dd>
+      <dt>Sensör kaynağı</dt><dd id="dSrc">–</dd>
+      <dt>Bu oturum</dt><dd id="dSes">–</dd>
+    </dl>
+    <button id="copy" class="wide">Veriyi kopyala</button>
+    <textarea id="out" readonly></textarea>
+    <h2>Kullanım</h2>
+    <ol>
+      <li>Sessiz modu kapat, sesi aç. Bluetooth hoparlör kullanma, sesi geciktirir.</li>
+      <li>BAŞLAT'a bas, hareket iznine "İzin Ver" de.</li>
+      <li>Telefonun hangi elde olduğunu seç, bileğe sabitle.</li>
+      <li>Öğret sekmesinden yumruklarını öğret. Telefonun bilekteki yerini değiştirirsen yeniden öğret.</li>
+      <li>Yalnızca gölge boksu yap. Telefon bilekteyken torbaya ya da bir şeye vurma.</li>
+    </ol>
+  </section>
 </main>
 
-<div id="lock"><div id="lockCount">0</div><div id="lockHint">Kilidi açmak için 2 saniye basılı tut</div></div>
+<nav id="tabs">
+  <button data-t="play" class="on">Çal</button>
+  <button data-t="lessons">Dersler</button>
+  <button data-t="teach">Öğret</button>
+  <button data-t="set">Ayarlar</button>
+</nav>
+
+<div id="lock"><div id="lockBig">–</div><div id="lockSub"></div><div id="lockHint">Kilidi açmak için 2 saniye basılı tut</div></div>
 
 <script>
-/* DETECTOR-START */
-// Bir vuruşu ivme verisinden yakalar. 'end' modunda vuruşun sonundaki frenlemeyi,
-// 'start' modunda ilk ivmelenmeyi tetik olarak kullanır.
+/* CORE-START */
+var TYPES = ['Direkt', 'Kroşe', 'Aparkat'];
+// Yumruğun bittiği andaki frenlemeyi yakalar.
 function makeDetector(cfg) {
   var state = 'idle', dir = null, peak = 0, tStart = 0, until = 0;
-  function fire(strength, t) {
-    state = 'refractory'; until = t + cfg.refractory;
-    cfg.onHit(strength, t);
-  }
+  function fire(s, t) { state = 'refractory'; until = t + cfg.refractory; cfg.onHit(s, t, tStart); }
   return {
     sample: function (x, y, z, t) {
-      var T = cfg.threshold;
-      var mag = Math.sqrt(x * x + y * y + z * z);
+      var T = cfg.threshold, mag = Math.sqrt(x * x + y * y + z * z);
       if (state === 'refractory') {
-        if ((t >= until && mag < T * 0.7) || t >= until + 250) state = 'idle';
-        else return mag;
+        if ((t >= until && mag < T * 0.7) || t >= until + 250) state = 'idle'; else return mag;
       }
       if (state === 'idle') {
-        if (mag > T) {
-          dir = [x / mag, y / mag, z / mag]; peak = mag; tStart = t;
-          if (cfg.mode === 'start') fire(mag, t); else state = 'armed';
-        }
+        if (mag > T) { dir = [x / mag, y / mag, z / mag]; peak = mag; tStart = t; state = 'armed'; }
         return mag;
       }
       if (mag > peak) peak = mag;
@@ -130,127 +163,301 @@ function makeDetector(cfg) {
     reset: function () { state = 'idle'; }
   };
 }
-/* DETECTOR-END */
+function unit(v) {
+  var m = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+  return m > 1e-6 ? [v[0] / m, v[1] / m, v[2] / m] : [0, 0, 0];
+}
+// Bir yumruğun penceresinden 13 sayılık özellik: bileğin bitişteki ve başlangıçtaki
+// duruşu (yerçekimi yönü), ivmelenme yönü, toplam dönüş ve süre.
+function features(buf, tStart, tEnd) {
+  var w = [], i, s;
+  for (i = 0; i < buf.length; i++) { s = buf[i]; if (s.t >= tStart - 40 && s.t <= tEnd) w.push(s); }
+  if (w.length < 2) w = buf.slice(-3);
+  if (!w.length) return null;
+  var g0 = unit(w[0].g), g1 = unit(w[w.length - 1].g), acc = [0, 0, 0], rot = [0, 0, 0];
+  var half = Math.max(1, Math.ceil(w.length / 2)), dt;
+  for (i = 0; i < w.length; i++) {
+    s = w[i]; dt = i ? Math.min(0.05, (s.t - w[i - 1].t) / 1000) : 0.017;
+    if (i < half) { acc[0] += s.a[0]; acc[1] += s.a[1]; acc[2] += s.a[2]; }
+    rot[0] += s.r[0] * dt; rot[1] += s.r[1] * dt; rot[2] += s.r[2] * dt;
+  }
+  var ad = unit(acc), c = function (v) { return Math.max(-2, Math.min(2, v / 90)); };
+  var d = Math.min(2, (tEnd - tStart) / 300);
+  return [g1[0], g1[1], g1[2], 0.6 * g0[0], 0.6 * g0[1], 0.6 * g0[2],
+    0.8 * ad[0], 0.8 * ad[1], 0.8 * ad[2], c(rot[0]), c(rot[1]), c(rot[2]), 0.3 * d];
+}
+function dist(a, b) { var s = 0, i, d; for (i = 0; i < a.length; i++) { d = a[i] - b[i]; s += d * d; } return Math.sqrt(s); }
+// En yakın k örneğe göre tip seçer. skip: kendini dışarıda bırakma testi için.
+function classify(x, ex, k, skip) {
+  var ds = [], i;
+  for (i = 0; i < ex.length; i++) if (i !== skip) ds.push({ c: ex[i].c, d: dist(x, ex[i].f) });
+  if (!ds.length) return null;
+  ds.sort(function (p, q) { return p.d - q.d; }); ds = ds.slice(0, k || 3);
+  var v = {}, best = null;
+  ds.forEach(function (n) { v[n.c] = (v[n.c] || 0) + 1 / (n.d + 0.05); });
+  Object.keys(v).forEach(function (c) { if (best === null || v[c] > v[best]) best = c; });
+  return { c: +best, d: ds[0].d };
+}
+function loo(ex) {
+  var ok = 0, conf = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], i, r;
+  for (i = 0; i < ex.length; i++) {
+    r = classify(ex[i].f, ex, 3, i);
+    if (r) { conf[ex[i].c][r.c]++; if (r.c === ex[i].c) ok++; }
+  }
+  return { acc: ex.length ? ok / ex.length : 0, conf: conf };
+}
+/* CORE-END */
 
 var $ = function (id) { return document.getElementById(id); };
-var SOUNDS = [
-  { id: 'kick', name: 'Kick' }, { id: 'snare', name: 'Trampet' }, { id: 'hat', name: 'Hi-hat' },
-  { id: 'clap', name: 'Alkış' }, { id: 'bass', name: 'Bas' }, { id: 'bell', name: 'Çan' }
+var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
+var PACKS = {
+  davul: { name: 'Davul', L: ['kick', 'snare', 'tom'], R: ['hat', 'clap', 'crash'] },
+  melodi: { name: 'Bas + Melodi', L: ['bass:55', 'bass:65.41', 'bass:82.41'], R: ['pluck:220', 'pluck:261.63', 'pluck:329.63'] },
+  can: { name: 'Çan', L: ['bell:220', 'bell:261.63', 'bell:329.63'], R: ['bell:440', 'bell:523.25', 'bell:659.25'] }
+};
+var LESSONS = [
+  { n: 'Dört direkt', seq: [0, 0, 0, 0] },
+  { n: 'Direkt, direkt, kroşe', seq: [0, 0, 1] },
+  { n: 'Direkt, kroşe, aparkat', seq: [0, 1, 2] },
+  { n: 'Kroşe, aparkat, kroşe', seq: [1, 2, 1] },
+  { n: 'Direkt, aparkat, kroşe, direkt', seq: [0, 2, 1, 0] },
+  { n: 'Uzun seri', seq: [0, 0, 1, 2, 1, 0] }
 ];
-var cfg = { threshold: 20, mode: 'end', refractory: 160, onHit: onHit };
-var det = makeDetector(cfg);
-var ctx = null, noise = null, sound = 'kick', running = false, count = 0;
-var hits = [], deltas = [], lastT = 0, src = '–', grav = [0, 0, 0], wake = null;
+var CAL_N = 8, KEY = 'vurus_v2';
+var S = { ex: [], hand: 'R', pack: 'davul', th: 20, bpm: 100, prog: 0 };
+try { var saved = JSON.parse(localStorage.getItem(KEY) || 'null'); if (saved) for (var k in saved) S[k] = saved[k]; } catch (e) {}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
 
-function say(text, good) {
-  var m = $('msg'); m.textContent = text || ''; m.className = text ? ('show' + (good ? ' good' : '')) : '';
+var cfg = { threshold: S.th, refractory: 160, onHit: onHit };
+var det = makeDetector(cfg);
+var ctx = null, noise = null, running = false, count = 0, tc = [0, 0, 0], hits = [];
+var buf = [], deltas = [], lastT = 0, src = '–', grav = [0, 0, 0], gyro = null;
+var cal = null, les = null, beat = { on: false, next: 0, step: 0, t0: 0 };
+
+function say(text, good) { var m = $('msg'); m.textContent = text || ''; m.className = text ? ('show' + (good ? ' good' : '')) : ''; }
+function speak(txt) {
+  try {
+    if (!window.speechSynthesis) return;
+    var u = new SpeechSynthesisUtterance(txt); u.lang = 'tr-TR'; u.rate = 1.05;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  } catch (e) {}
 }
 
 /* ---------- ses ---------- */
-function env(g, t, peak, dur) {
-  g.gain.setValueAtTime(peak, t);
-  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+function tone(type, f0, f1, dur, peak, t, out) {
+  var o = ctx.createOscillator(), g = ctx.createGain(); o.type = type;
+  o.frequency.setValueAtTime(f0, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.5);
+  g.gain.setValueAtTime(peak, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + 0.02);
 }
-function noiseSrc() { var s = ctx.createBufferSource(); s.buffer = noise; return s; }
-function play(id, vol) {
+function nz(ftype, freq, dur, peak, t, out, q) {
+  var n = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+  n.buffer = noise; f.type = ftype; f.frequency.value = freq; if (q) f.Q.value = q;
+  g.gain.setValueAtTime(peak, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  n.connect(f); f.connect(g); g.connect(out); n.start(t); n.stop(t + dur + 0.02);
+}
+function play(def, vol, when) {
   if (!ctx) return;
-  var t = ctx.currentTime, out = ctx.createGain(); out.gain.value = vol; out.connect(ctx.destination);
-  var o, g, f, n;
-  if (id === 'kick') {
-    o = ctx.createOscillator(); g = ctx.createGain(); o.type = 'sine';
-    o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
-    env(g, t, 1, 0.28); o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.3);
-  } else if (id === 'snare') {
-    n = noiseSrc(); f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 1200; g = ctx.createGain();
-    env(g, t, 0.9, 0.16); n.connect(f); f.connect(g); g.connect(out); n.start(t); n.stop(t + 0.18);
-    o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(190, t);
-    var g2 = ctx.createGain(); env(g2, t, 0.6, 0.09); o.connect(g2); g2.connect(out); o.start(t); o.stop(t + 0.1);
-  } else if (id === 'hat') {
-    n = noiseSrc(); f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7000; g = ctx.createGain();
-    env(g, t, 0.7, 0.06); n.connect(f); f.connect(g); g.connect(out); n.start(t); n.stop(t + 0.07);
-  } else if (id === 'clap') {
-    n = noiseSrc(); f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1500; f.Q.value = 1.2; g = ctx.createGain();
-    g.gain.setValueAtTime(0.9, t); g.gain.setValueAtTime(0.2, t + 0.012); g.gain.setValueAtTime(0.9, t + 0.024);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
-    n.connect(f); f.connect(g); g.connect(out); n.start(t); n.stop(t + 0.2);
-  } else if (id === 'bass') {
-    o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(55, t);
-    f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(900, t); f.frequency.exponentialRampToValueAtTime(120, t + 0.3);
-    g = ctx.createGain(); env(g, t, 0.9, 0.4); o.connect(f); f.connect(g); g.connect(out); o.start(t); o.stop(t + 0.42);
-  } else {
-    [523.25, 1046.5, 1568].forEach(function (hz, i) {
-      var oo = ctx.createOscillator(), gg = ctx.createGain(); oo.type = 'sine'; oo.frequency.value = hz;
-      env(gg, t, [0.6, 0.25, 0.1][i], 0.7); oo.connect(gg); gg.connect(out); oo.start(t); oo.stop(t + 0.72);
-    });
-  }
+  var t = when || ctx.currentTime, out = ctx.createGain(); out.gain.value = vol; out.connect(ctx.destination);
+  var p = def.split(':'), k = p[0], f = +p[1];
+  if (k === 'kick') tone('sine', 160, 45, 0.28, 1, t, out);
+  else if (k === 'snare') { nz('highpass', 1200, 0.16, 0.9, t, out); tone('triangle', 190, 0, 0.09, 0.6, t, out); }
+  else if (k === 'hat') nz('highpass', 7000, 0.06, 0.7, t, out);
+  else if (k === 'clap') nz('bandpass', 1500, 0.18, 0.9, t, out, 1.2);
+  else if (k === 'tom') tone('sine', 220, 110, 0.3, 0.9, t, out);
+  else if (k === 'crash') nz('highpass', 4000, 0.7, 0.6, t, out);
+  else if (k === 'bass') { tone('sawtooth', f, 0, 0.4, 0.45, t, out); tone('sine', f, 0, 0.45, 0.8, t, out); }
+  else if (k === 'pluck') { tone('triangle', f, 0, 0.35, 0.8, t, out); tone('sine', f * 2, 0, 0.2, 0.25, t, out); }
+  else if (k === 'bell') { tone('sine', f, 0, 0.7, 0.6, t, out); tone('sine', f * 2, 0, 0.5, 0.25, t, out); tone('sine', f * 3, 0, 0.3, 0.1, t, out); }
+  else if (k === 'buzz') tone('square', 90, 0, 0.18, 0.35, t, out);
+  else if (k === 'tick') tone('sine', 1320, 0, 0.07, 0.5, t, out);
 }
 function initAudio() {
   if (ctx) return ctx.resume();
   try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
   var AC = window.AudioContext || window.webkitAudioContext;
   ctx = new AC({ latencyHint: 'interactive' });
-  var len = Math.floor(ctx.sampleRate * 0.25); noise = ctx.createBuffer(1, len, ctx.sampleRate);
+  var len = Math.floor(ctx.sampleRate * 0.8); noise = ctx.createBuffer(1, len, ctx.sampleRate);
   var d = noise.getChannelData(0); for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
   return ctx.resume();
 }
 
-/* ---------- vuruş ---------- */
-function onHit(strength) {
-  count++; hits.push(Math.round(strength)); if (hits.length > 200) hits.shift();
-  var vol = Math.max(0.3, Math.min(1, (strength - cfg.threshold) / 50 + 0.3));
-  play(sound, vol);
-  $('count').textContent = count; $('lockCount').textContent = count;
-  $('last').textContent = 'son vuruş şiddeti: ' + Math.round(strength) + ' m/s²';
-  flash($('pad')); flash($('lock'));
+/* ---------- eşlik ritmi ---------- */
+function beatTick() {
+  if (!ctx || !beat.on) return;
+  var sp = 30 / S.bpm;
+  while (beat.next < ctx.currentTime + 0.12) {
+    var s = beat.step % 8;
+    if (s % 2 === 0) play('kick', s === 0 ? 0.3 : 0.2, beat.next);
+    if (s === 2 || s === 6) play('snare', 0.13, beat.next);
+    play('hat', 0.07, beat.next);
+    beat.next += sp; beat.step++;
+  }
 }
-function flash(el) { el.classList.add('flash'); setTimeout(function () { el.classList.remove('flash'); }, 90); }
+setInterval(beatTick, 25);
+function setBeat(on) {
+  beat.on = on && !!ctx;
+  if (beat.on) { beat.next = ctx.currentTime + 0.1; beat.t0 = beat.next; beat.step = 0; }
+  $('beatBtn').textContent = beat.on ? 'Açık' : 'Kapalı'; $('beatBtn').className = beat.on ? 'sel' : '';
+}
+function inRhythm() {
+  if (!beat.on || !ctx) return false;
+  var sp = 30 / S.bpm, o = (ctx.currentTime - beat.t0) % sp; if (o < 0) o += sp;
+  return Math.min(o, sp - o) < 0.09;
+}
+
+/* ---------- vuruş ---------- */
+function onHit(strength, t, tStart) {
+  var f = features(buf, tStart, t); if (!f) return;
+  if (cal) { calHit(f, t); return; }
+  var type = 0;
+  if (S.ex.length) { var r = classify(f, S.ex, 3); if (r) type = r.c; }
+  var vol = Math.max(0.3, Math.min(1, (strength - cfg.threshold) / 50 + 0.3));
+  play(PACKS[S.pack][S.hand][type], vol);
+  try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
+  count++; tc[type]++; hits.push(Math.round(strength)); if (hits.length > 200) hits.shift();
+  var good = null, inLesson = !!les;
+  if (les) { good = lessonHit(type, inRhythm()); if (good === false) play('buzz', 0.5); }
+  var name = S.ex.length ? TYPES[type] : 'Vuruş';
+  $('big').textContent = name; $('count').textContent = count;
+  $('sub').textContent = 'şiddet ' + Math.round(strength) + ' m/s²';
+  if (!inLesson) { $('lockBig').textContent = name; $('lockSub').textContent = count + ' vuruş'; }
+  flash($('pad'), good === false); flash($('lock'), good === false);
+}
+function flash(el, bad) {
+  el.classList.add('flash'); if (bad) el.classList.add('bad');
+  setTimeout(function () { el.classList.remove('flash'); el.classList.remove('bad'); }, 110);
+}
+
+/* ---------- öğretme ---------- */
+function r3(v) { return Math.round(v * 1000) / 1000; }
+function calBegin() {
+  if (!running) { say('Önce BAŞLAT\'a bas.'); return; }
+  les = null; renderLessons(); S.ex = []; S.acc = null;
+  cal = { c: 0, n: 0, wait: performance.now() + 3500 };
+  speak('Direkt. Sekiz kez at.'); play('bell:660', 0.5); renderCal();
+}
+function calHit(f, t) {
+  if (t < cal.wait) return;
+  S.ex.push({ c: cal.c, f: f.map(r3) }); cal.n++; play('tick', 0.6);
+  if (cal.n >= CAL_N) {
+    cal.c++; cal.n = 0;
+    if (cal.c >= TYPES.length) {
+      cal = null; var r = loo(S.ex); S.acc = r.acc; S.conf = r.conf; save();
+      speak('Bitti.'); play('bell:880', 0.6);
+    } else { cal.wait = t + 3500; speak(TYPES[cal.c] + '. Sekiz kez at.'); play('bell:660', 0.5); }
+  }
+  renderCal();
+}
+function renderCal() {
+  var n = [0, 0, 0]; S.ex.forEach(function (e) { n[e.c]++; });
+  $('calStatus').innerHTML = TYPES.map(function (name, i) {
+    var cur = cal && cal.c === i;
+    return '<div class="row" style="justify-content:space-between;padding:4px 0' + (cur ? ';color:var(--hit);font-weight:700' : '') + '"><span>' +
+      name + (cur ? ' ← şimdi bunu at' : '') + '</span><span>' + n[i] + ' / ' + CAL_N + '</span></div>';
+  }).join('');
+  $('calStart').textContent = cal ? 'Öğretiliyor…' : (S.ex.length ? 'Yeniden öğret' : 'Öğretmeye başla');
+  $('calStart').disabled = !!cal;
+  var txt = '';
+  if (!cal && S.ex.length && S.acc != null) {
+    txt = 'Ayırt etme başarısı: %' + Math.round(S.acc * 100) + ' (' + S.ex.length + ' örnek üzerinde kendi kendini sınama).';
+    var worst = 0, pair = null;
+    if (S.conf) S.conf.forEach(function (row, i) { row.forEach(function (v, j) { if (i !== j && v > worst) { worst = v; pair = [i, j]; } }); });
+    if (S.acc < 0.8 && pair) txt += ' En çok karışan: ' + TYPES[pair[0]] + ' ile ' + TYPES[pair[1]] + '. Yumrukları daha belirgin atarak yeniden öğret.';
+    else if (S.acc >= 0.8) txt += ' Çal ve Dersler sekmeleri artık üç tipi ayırıyor.';
+  }
+  $('calResult').textContent = txt;
+  if (cal) { $('lockBig').textContent = TYPES[cal.c]; $('lockSub').textContent = cal.n + ' / ' + CAL_N; }
+  renderHint();
+}
+function renderHint() {
+  $('hint').textContent = S.ex.length ? '' : 'Şu an her yumruk aynı sesi çalar. Üç ayrı ses için Öğret sekmesinden yumruklarını öğret.';
+}
+
+/* ---------- dersler ---------- */
+function renderLessons() {
+  $('lessonList').innerHTML = LESSONS.map(function (l, i) {
+    var open = i <= S.prog, done = i < S.prog;
+    return '<button class="lesson" data-i="' + i + '"' + (open ? '' : ' disabled') + '><span>' + (i + 1) + ' · ' + l.n +
+      '</span><small>' + (done ? 'geçildi' : (open ? 'açık' : 'kilitli')) + '</small></button>';
+  }).join('');
+  each($('lessonList').children, function (b) { b.addEventListener('click', function () { startLesson(+b.getAttribute('data-i')); }); });
+  $('lessonRun').hidden = !les;
+  if (!les) return;
+  $('lName').textContent = (les.i + 1) + ' · ' + LESSONS[les.i].n;
+  var at = les.pos % les.seq.length, html = '';
+  les.seq.forEach(function (ty, j) {
+    var cls = 'chip' + (j === at ? ' cur' : '');
+    if (j < at && les.round[j] != null) cls += les.round[j] ? ' ok' : ' no';
+    html += '<span class="' + cls + '">' + TYPES[ty] + '</span>';
+  });
+  $('chips').innerHTML = html;
+  $('lStat').textContent = les.pos + ' / ' + les.total + ' · doğru ' + les.ok + (beat.on ? ' · ritimde ' + les.rh : '');
+  $('lockBig').textContent = TYPES[les.seq[at]]; $('lockSub').textContent = 'sıradaki · ' + les.pos + ' / ' + les.total;
+}
+function startLesson(i) {
+  if (!running) { say('Önce BAŞLAT\'a bas.'); return; }
+  if (!S.ex.length) { say('Dersler için önce Öğret sekmesinden yumruklarını öğret.'); return; }
+  say(''); les = { i: i, seq: LESSONS[i].seq, pos: 0, total: LESSONS[i].seq.length * 4, ok: 0, rh: 0, round: [] };
+  speak(LESSONS[i].n); renderLessons();
+}
+function lessonHit(type, inR) {
+  var at = les.pos % les.seq.length, good = type === les.seq[at];
+  if (at === 0) les.round = [];
+  les.round[at] = good; if (good) les.ok++; if (inR) les.rh++; les.pos++;
+  if (les.pos >= les.total) { endLesson(true); return good; }
+  renderLessons(); return good;
+}
+function endLesson(finished) {
+  if (!les) return;
+  if (finished) {
+    var pct = Math.round(les.ok / les.total * 100), pass = pct >= 80;
+    if (pass && les.i >= S.prog) { S.prog = les.i + 1; save(); }
+    say('Ders ' + (les.i + 1) + ': %' + pct + ' doğru' + (beat.on ? ', ' + les.rh + ' vuruş ritimde' : '') + '. ' +
+      (pass ? 'Geçtin.' : 'Geçmek için %80 gerekli, tekrar dene.'), pass);
+    speak(pass ? 'Geçtin.' : 'Tekrar dene.'); play(pass ? 'bell:880' : 'buzz', 0.6);
+    $('lockBig').textContent = '%' + pct; $('lockSub').textContent = pass ? 'geçtin' : 'tekrar dene';
+  }
+  les = null; renderLessons();
+}
 
 /* ---------- sensör ---------- */
 function onMotion(e) {
-  var t = performance.now(), a = e.acceleration, x, y, z;
-  if (a && a.x !== null && a.x !== undefined) { x = a.x; y = a.y; z = a.z; src = 'doğrusal ivme'; }
-  else {
-    var g = e.accelerationIncludingGravity; if (!g || g.x === null) return;
-    for (var i = 0, v = [g.x, g.y, g.z]; i < 3; i++) grav[i] = grav[i] * 0.9 + v[i] * 0.1;
-    x = g.x - grav[0]; y = g.y - grav[1]; z = g.z - grav[2]; src = 'ham ivme (süzülmüş)';
-  }
+  var t = performance.now(), a = e.acceleration, ig = e.accelerationIncludingGravity, rr = e.rotationRate, A, G, i;
+  var hasIg = ig && ig.x !== null && ig.x !== undefined, hasA = a && a.x !== null && a.x !== undefined;
+  if (hasIg) { var v = [ig.x, ig.y, ig.z]; for (i = 0; i < 3; i++) grav[i] = grav[i] * 0.9 + v[i] * 0.1; }
+  if (hasA) { A = [a.x, a.y, a.z]; G = hasIg ? [ig.x - a.x, ig.y - a.y, ig.z - a.z] : [0, 0, 0]; src = 'doğrusal ivme'; }
+  else if (hasIg) { A = [ig.x - grav[0], ig.y - grav[1], ig.z - grav[2]]; G = grav.slice(); src = 'ham ivme (süzülmüş)'; }
+  else return;
+  var hasR = rr && rr.alpha !== null && rr.alpha !== undefined;
+  gyro = hasR; var R = hasR ? [rr.alpha, rr.beta, rr.gamma] : [0, 0, 0];
+  buf.push({ t: t, a: A, g: G, r: R }); if (buf.length > 45) buf.shift();
   if (lastT) { deltas.push(t - lastT); if (deltas.length > 120) deltas.shift(); }
   lastT = t;
-  var mag = det.sample(x, y, z, t);
+  var mag = det.sample(A[0], A[1], A[2], t);
   $('bar').style.width = Math.min(100, mag / 60 * 100) + '%';
 }
-function median(arr) {
-  if (!arr.length) return null; var s = arr.slice().sort(function (p, q) { return p - q; });
-  return s[Math.floor(s.length / 2)];
-}
-function stats() {
-  var int = median(deltas);
-  var out = ctx ? ((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000 : null;
-  return { int: int, out: out, tot: (int !== null && out !== null) ? int + out : null };
-}
+function median(arr) { if (!arr.length) return null; var s = arr.slice().sort(function (p, q) { return p - q; }); return s[Math.floor(s.length / 2)]; }
+function stats() { return { int: median(deltas), out: ctx ? ((ctx.baseLatency || 0) + (ctx.outputLatency || 0)) * 1000 : null }; }
 function showStats() {
   var s = stats();
   $('dInt').textContent = s.int === null ? '–' : s.int.toFixed(1) + ' ms';
   $('dOut').textContent = s.out === null ? '–' : (s.out > 0 ? s.out.toFixed(1) + ' ms' : 'tarayıcı bildirmiyor');
-  $('dTot').textContent = (s.tot === null || !s.out) ? '–' : '≈ ' + s.tot.toFixed(0) + ' ms';
+  $('dGyro').textContent = gyro === null ? '–' : (gyro ? 'var' : 'yok');
   $('dSrc').textContent = src;
+  $('dSes').textContent = count + ' vuruş (' + tc.join(' / ') + ')';
   if (running && lastT && performance.now() - lastT > 2000) say('Sensör verisi gelmiyor. Sayfayı yenileyip BAŞLAT\'a tekrar bas.');
 }
 setInterval(showStats, 500);
-
-function keepAwake() {
-  if (!('wakeLock' in navigator)) return;
-  navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () {});
-}
+function keepAwake() { if ('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(function () {}); }
 document.addEventListener('visibilitychange', function () {
   if (running && document.visibilityState === 'visible') { keepAwake(); if (ctx) ctx.resume(); }
 });
-
 function begin() {
   window.addEventListener('devicemotion', onMotion);
   running = true; lastT = 0; keepAwake();
-  $('start').textContent = 'ÇALIŞIYOR'; $('start').classList.add('on');
-  say('Hazır. Bir ses seç ve vur.', true); play(sound, 0.6);
+  $('start').textContent = 'Çalışıyor'; $('start').classList.add('on');
+  $('sub').textContent = 'hazır, vur'; say(''); play(PACKS[S.pack][S.hand][0], 0.6);
 }
 $('start').addEventListener('click', function () {
   if (running) return;
@@ -266,41 +473,52 @@ $('start').addEventListener('click', function () {
 });
 
 /* ---------- arayüz ---------- */
-SOUNDS.forEach(function (s) {
-  var b = document.createElement('button'); b.textContent = s.name; if (s.id === sound) b.className = 'sel';
+each($('tabs').children, function (b) {
   b.addEventListener('click', function () {
-    sound = s.id; Array.prototype.forEach.call($('sounds').children, function (c) { c.className = ''; });
-    b.className = 'sel'; play(sound, 0.7);
-  });
-  $('sounds').appendChild(b);
-});
-function setTh(v) { cfg.threshold = v; $('thv').textContent = v; $('tick').style.left = Math.min(100, v / 60 * 100) + '%'; }
-$('th').addEventListener('input', function () { setTh(+this.value); }); setTh(20);
-Array.prototype.forEach.call($('modes').children, function (b) {
-  b.addEventListener('click', function () {
-    cfg.mode = b.getAttribute('data-mode'); det.reset();
-    Array.prototype.forEach.call($('modes').children, function (c) { c.className = ''; }); b.className = 'sel';
+    each($('tabs').children, function (c) { c.className = ''; }); b.className = 'on';
+    each(document.querySelectorAll('.view'), function (v) { v.classList.remove('on'); });
+    $('v-' + b.getAttribute('data-t')).classList.add('on'); window.scrollTo(0, 0);
   });
 });
-$('test').addEventListener('click', function () { Promise.resolve(initAudio()).then(function () { play(sound, 0.8); }); });
-$('reset').addEventListener('click', function () {
-  count = 0; hits = []; $('count').textContent = 0; $('lockCount').textContent = 0; $('last').textContent = 'henüz vuruş yok';
+function renderChoices() {
+  each($('hands').children, function (b) { b.className = b.getAttribute('data-v') === S.hand ? 'sel' : ''; });
+  each($('packs').children, function (b) { b.className = b.getAttribute('data-v') === S.pack ? 'sel' : ''; });
+}
+Object.keys(PACKS).forEach(function (id) {
+  var b = document.createElement('button'); b.textContent = PACKS[id].name; b.setAttribute('data-v', id);
+  b.addEventListener('click', function () { S.pack = id; save(); renderChoices(); play(PACKS[id][S.hand][0], 0.7); });
+  $('packs').appendChild(b);
 });
+each($('hands').children, function (b) {
+  b.addEventListener('click', function () { S.hand = b.getAttribute('data-v'); save(); renderChoices(); play(PACKS[S.pack][S.hand][0], 0.7); });
+});
+function setTh(v) { S.th = v; cfg.threshold = v; $('th').value = v; $('thv').textContent = v; $('tick').style.left = Math.min(100, v / 60 * 100) + '%'; }
+$('th').addEventListener('input', function () { setTh(+this.value); save(); });
+function setBpm(v) { S.bpm = v; $('bpm').value = v; $('bpmv').textContent = v + ' BPM'; }
+$('bpm').addEventListener('input', function () { setBpm(+this.value); save(); if (beat.on) setBeat(true); });
+$('beatBtn').addEventListener('click', function () {
+  if (!ctx) { say('Önce BAŞLAT\'a bas.'); return; }
+  setBeat(!beat.on);
+});
+$('calStart').addEventListener('click', calBegin);
+$('calClear').addEventListener('click', function () { cal = null; S.ex = []; S.acc = null; S.conf = null; save(); renderCal(); });
+$('lStop').addEventListener('click', function () { endLesson(false); });
 $('copy').addEventListener('click', function () {
   var s = stats(), f = function (v) { return v === null ? '?' : v.toFixed(1); };
-  var txt = 'Vuruş Testi sonucu\n' +
+  var txt = 'Vuruş v0.2 verisi\n' +
     'cihaz: ' + navigator.userAgent.replace(/^.*?\((.*?)\).*$/, '$1') + '\n' +
-    'ses: ' + sound + ' | mod: ' + (cfg.mode === 'end' ? 'sonunda' : 'başında') + ' | eşik: ' + cfg.threshold + '\n' +
-    'vuruş sayısı: ' + count + '\n' +
-    'sensör aralığı: ' + f(s.int) + ' ms | ses çıkışı: ' + f(s.out) + ' ms | kaynak: ' + src + '\n' +
-    'son vuruş şiddetleri: ' + hits.slice(-30).join(', ');
+    'el: ' + S.hand + ' | paket: ' + S.pack + ' | eşik: ' + S.th + ' | ritim: ' + (beat.on ? S.bpm : 'kapalı') + '\n' +
+    'sensör aralığı: ' + f(s.int) + ' ms | ses çıkışı: ' + f(s.out) + ' ms | jiroskop: ' + (gyro ? 'var' : 'yok') + ' | kaynak: ' + src + '\n' +
+    'oturum: ' + count + ' vuruş, tiplere göre ' + tc.join('/') + ' | ders ilerlemesi: ' + S.prog + '\n' +
+    'ayırt etme: ' + (S.acc == null ? '-' : Math.round(S.acc * 100) + '%') + ' | karışıklık: ' + JSON.stringify(S.conf || []) + '\n' +
+    'son şiddetler: ' + hits.slice(-20).join(',') + '\n' +
+    'örnekler: ' + JSON.stringify(S.ex.map(function (e) { return [e.c].concat(e.f.map(function (v) { return Math.round(v * 100) / 100; })); }));
   var ta = $('out'); ta.value = txt; ta.style.display = 'block';
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(txt).then(function () { say('Kopyalandı. Sohbete yapıştırabilirsin.', true); })
       .catch(function () { say('Otomatik kopyalanamadı. Aşağıdaki metni elle kopyala.'); });
   } else say('Aşağıdaki metni elle kopyala.');
 });
-
 var holdTimer = null;
 $('lockBtn').addEventListener('click', function () { $('lock').classList.add('show'); });
 function holdStart(e) { e.preventDefault(); holdTimer = setTimeout(function () { $('lock').classList.remove('show'); }, 2000); }
@@ -308,6 +526,8 @@ function holdEnd() { clearTimeout(holdTimer); }
 $('lock').addEventListener('touchstart', holdStart, { passive: false });
 $('lock').addEventListener('touchend', holdEnd); $('lock').addEventListener('touchcancel', holdEnd);
 $('lock').addEventListener('mousedown', holdStart); $('lock').addEventListener('mouseup', holdEnd);
+
+setTh(S.th); setBpm(S.bpm); renderChoices(); renderCal(); renderLessons();
 </script>
 </body>
 </html>
