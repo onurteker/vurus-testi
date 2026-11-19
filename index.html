@@ -71,7 +71,7 @@ nav button.on{color:var(--hit);font-weight:700;background:var(--panel)}
 </head>
 <body>
 <main>
-  <header><h1>Vuruş</h1><span id="ver">v0.3</span><span id="badge"></span></header>
+  <header><h1>Vuruş</h1><span id="ver">v0.4</span><span id="badge"></span></header>
   <button id="start">BAŞLAT</button>
   <div id="msg"></div>
 
@@ -89,7 +89,7 @@ nav button.on{color:var(--hit);font-weight:700;background:var(--panel)}
   </section>
 
   <section class="view" id="v-song">
-    <p class="note">Notayı şarkı verir: doğru yumruğu attığında melodinin sıradaki notası çalar. Uygulama önce bölümü çalıp kombinasyonu söyler, sonra sıra sana geçer. İki telefon bağlıysa numaralar geçerlidir: 1 sol direkt, 2 sağ direkt, 3 sol kroşe, 4 sağ kroşe, 5 sol aparkat, 6 sağ aparkat. Tek telefonda yalnızca yumruk tipi sayılır.</p>
+    <p class="note">Notayı şarkı verir: doğru yumruğu attığında melodinin sıradaki notası çalar. Uygulama önce bölümü çalıp kombinasyonu söyler, sonra sıra sana geçer. İki telefon bağlıysa numaralar geçerlidir: 1 sol direkt, 2 sağ direkt, 3 sol kroşe, 4 sağ kroşe, 5 sol aparkat, 6 sağ aparkat; her telefon kendi elinin notasını çalar. Tek telefonda yalnızca yumruk tipi sayılır.</p>
     <div id="songList"></div>
     <div class="row sp"><span>Kombinasyonu önce uygulama çağırsın</span><button id="callBtn"></button></div>
     <div id="songRun" class="card" hidden>
@@ -117,7 +117,7 @@ nav button.on{color:var(--hit);font-weight:700;background:var(--panel)}
   </section>
 
   <section class="view" id="v-link">
-    <p class="note">İki telefonu bağla. Ana telefon bütün sesi çalar ve şarkıyı yönetir, ikinci telefon yalnızca kendi elinin yumruklarını ona yollar. İki telefon da internete bağlı olmalı; aynı Wi-Fi'da olmaları en iyisi. Her telefonda önce el seçilmeli ve yumruklar öğretilmeli.</p>
+    <p class="note">İki telefonu aynı şarkıda birleştirir. Ana telefon şarkıyı, ritmi ve çağrıyı yönetir; her telefon kendi elinin sesini kendisi çalar. İki telefonun da internete bağlı olması yeterli, aynı Wi-Fi şart değil. Her telefonda önce el seçilmeli ve yumruklar öğretilmeli.</p>
     <div class="g2"><button id="hostBtn">Ana telefon ol</button><button id="joinBtn">Koda bağlan</button></div>
     <div class="row sp" id="joinRow" hidden><input id="code" type="text" inputmode="numeric" maxlength="4" placeholder="kod"><button id="joinGo" class="primary">Bağlan</button></div>
     <div class="card" id="linkStatus"></div>
@@ -163,7 +163,7 @@ nav button.on{color:var(--hit);font-weight:700;background:var(--panel)}
 
 <div id="lock"><div id="lockBig">–</div><div id="lockSub"></div><div id="lockHint">Kilidi açmak için 2 saniye basılı tut</div></div>
 
-<script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
+<script src="https://unpkg.com/mqtt@5.16.1/dist/mqtt.min.js"></script>
 <script>
 /* CORE-START */
 var TYPES = ['Direkt', 'Kroşe', 'Aparkat'];
@@ -290,7 +290,7 @@ var ctx = null, noise = null, running = false, count = 0, tc = [0, 0, 0], hits =
 var buf = [], deltas = [], lastT = 0, src = '–', grav = [0, 0, 0], gyro = null;
 var cal = null, les = null, song = null, tst = null, songSeq = 0;
 var beat = { on: false, next: 0, step: 0, t0: 0 };
-var link = { role: null, peer: null, conn: null, code: null, ok: false, err: null, rtt: [], other: null, got: 0 };
+var link = newLink();
 
 function say(text, good) { var m = $('msg'); m.textContent = text || ''; m.className = text ? ('show' + (good ? ' good' : '')) : ''; }
 function speak(txt) {
@@ -380,20 +380,16 @@ function onHit(strength, t, tStart) {
   if (S.ex.length) { var r = classify(f, S.ex, 3); if (r) type = r.c; }
   if (tst) { testHit(type, f, t); return; }
   try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
-  if (link.ok && link.role === 'join') {
-    try { link.conn.send({ k: 'hit', ty: type, s: Math.round(strength), h: S.hand }); } catch (e) {}
-    count++; tc[type]++; hits.push(Math.round(strength)); if (hits.length > 200) hits.shift();
-    showHit(S.hand, type, strength, null); return;
-  }
   handleHit(S.hand, type, strength);
 }
-// Ses çalan telefonda (tek başına ya da ana telefon) her iki elin yumrukları buradan geçer.
+// Bu telefonun kendi yumrukları. Ses her zaman bu telefondan, gecikmesiz çıkar.
 function handleHit(hand, type, strength) {
   count++; if (hand === S.hand) { tc[type]++; hits.push(Math.round(strength)); if (hits.length > 200) hits.shift(); }
   var vol = Math.max(0.3, Math.min(1, (strength - cfg.threshold) / 50 + 0.3)), good = null, busy = !!(song || les);
-  if (song) good = songHit(hand, type, vol);
+  if (song) good = songHit(type, vol);
   else {
     play(PACKS[S.pack][hand][type], vol);
+    if (link.ok) tx({ k: 'hit', ty: type, s: Math.round(strength), h: hand });
     if (les) { good = lessonHit(type, inRhythm()); if (good === false) play('buzz', 0.5); }
   }
   showHit(hand, type, strength, good, busy);
@@ -427,7 +423,7 @@ function calHit(f, t) {
     if (cal.c >= TYPES.length) {
       cal = null; var p = prune(S.ex); S.ex = p.ex; S.drop = p.dropped;
       var r = loo(S.ex); S.acc = r.acc; S.conf = r.conf; save();
-      speak('Bitti.'); play('bell:880', 0.6);
+      speak('Bitti.'); play('bell:880', 0.6); if (link.ok) hello(true);
     } else { cal.wait = t + 3500; speak(TYPES[cal.c] + '. Sekiz kez at.'); play('bell:660', 0.5); }
   }
   renderCal();
@@ -499,6 +495,9 @@ function renderTest() {
 }
 
 /* ---------- şarkı ---------- */
+function phrase() { return SONGS[song.i].phrases[song.ph]; }
+// Bağlıyken her telefon yalnızca kendi elinin adımlarını çalar; tek telefonda hepsi onundur.
+function mySteps(ph) { return ph.filter(function (st) { return !link.ok || pn(st[0]).h === S.hand; }); }
 function stepName(st) { var p = pn(st[0]); return link.ok ? st[0] + ' · ' + handName(p.h) + ' ' + TYPES[p.ty].toLowerCase() : TYPES[p.ty]; }
 function renderSong() {
   $('songList').innerHTML = SONGS.map(function (s, i) {
@@ -509,16 +508,21 @@ function renderSong() {
   $('callBtn').textContent = S.call ? 'Açık' : 'Kapalı'; $('callBtn').className = S.call ? 'sel' : '';
   $('songRun').hidden = !song;
   if (!song) return;
-  var sg = SONGS[song.i], ph = sg.phrases[song.ph], html = '';
+  var sg = SONGS[song.i], ph = phrase(), html = '', k = 0, done = song.pos >= song.mine.length;
   $('sName').textContent = sg.n + ' · bölüm ' + (song.ph + 1) + ' / ' + sg.phrases.length;
-  ph.forEach(function (st, j) {
-    var cls = 'chip' + (song.phase === 'play' && j === song.pos ? ' cur' : '');
-    if (j < song.pos && song.round[j] != null) cls += song.round[j] ? ' ok' : ' no';
-    html += '<span class="' + cls + '">' + stepName(st) + '</span>';
+  ph.forEach(function (st) {
+    var mine = !link.ok || pn(st[0]).h === S.hand, cls = 'chip';
+    if (mine) {
+      if (song.phase === 'play' && k === song.pos) cls += ' cur';
+      else if (k < song.pos && song.round[k] != null) cls += song.round[k] ? ' ok' : ' no';
+      k++;
+    }
+    html += '<span class="' + cls + '"' + (mine ? '' : ' style="opacity:.45"') + '>' + stepName(st) + '</span>';
   });
   $('sChips').innerHTML = html;
-  $('sStat').textContent = (song.phase === 'call' ? 'Dinle' : 'Sıra sende') + ' · doğru ' + song.ok + ' / ' + song.total;
-  $('lockBig').textContent = song.phase === 'call' ? 'Dinle' : stepName(ph[Math.min(song.pos, ph.length - 1)]);
+  var state = song.phase === 'call' ? 'Dinle' : (done ? 'Diğer el bekleniyor' : 'Sıra sende');
+  $('sStat').textContent = state + (song.lead ? ' · doğru ' + song.ok + ' / ' + song.total : ' · şarkıyı ana telefon yönetiyor');
+  $('lockBig').textContent = song.phase === 'call' ? 'Dinle' : (done ? 'Bekle' : stepName(song.mine[song.pos]));
   $('lockSub').textContent = 'bölüm ' + (song.ph + 1) + ' / ' + sg.phrases.length;
 }
 function startSong(i) {
@@ -526,47 +530,85 @@ function startSong(i) {
   if (link.ok && link.role === 'join') { say('Şarkıyı ana telefondan başlat.'); return; }
   if (!S.ex.length) { say('Şarkı için önce Öğret sekmesinden yumruklarını öğret.'); return; }
   say(''); stopModes(); cal = null; tst = null;
-  song = { i: i, ph: 0, pos: 0, ok: 0, total: 0, rh: 0, phase: 'call', round: [], id: ++songSeq };
+  song = { i: i, ph: 0, pos: 0, ok: 0, total: 0, rh: 0, phase: 'call', round: [], mine: [], rem: 0, wait: null, lead: true, id: link.me + (++songSeq) };
+  if (link.ok) tx({ k: 'song', i: i, id: song.id });
   setBeat(true); callPhrase();
 }
+function setPhase(p) {
+  song.phase = p;
+  if (link.ok && song.lead) tx({ k: 'ph', id: song.id, ph: song.ph, phase: p });
+  renderSong();
+  if (p === 'play' && song.lead) checkPhrase();
+}
 function callPhrase() {
-  var ph = SONGS[song.i].phrases[song.ph], q = 60 / tempo();
-  song.pos = 0; song.round = [];
-  if (!S.call) { song.phase = 'play'; renderSong(); return; }
-  song.phase = 'call';
+  var ph = phrase(), q = 60 / tempo();
+  song.pos = 0; song.round = []; song.mine = mySteps(ph); song.rem = ph.length - song.mine.length;
+  clearTimeout(song.wait); song.wait = null;
+  if (!S.call) { setPhase('play'); return; }
+  setPhase('call');
   var t0 = nextBeat(), id = song.id, at = song.ph;
   ph.forEach(function (st, k) { play('bell:' + NOTE[st[1]], 0.3, t0 + k * q); });
   speak(ph.map(function (st) { return link.ok ? NUM[st[0] - 1] : TYPES[pn(st[0]).ty]; }).join(', '));
   setTimeout(function () {
-    if (song && song.id === id && song.ph === at && song.phase === 'call') { song.phase = 'play'; play('tick', 0.5); renderSong(); }
+    if (song && song.id === id && song.ph === at && song.phase === 'call') { play('tick', 0.5); setPhase('play'); }
   }, Math.max(300, (t0 - ctx.currentTime + ph.length * q) * 1000));
+}
+// Yalnızca bu telefonun kendi yumrukları buraya gelir; nota gecikmesiz, yerinde çalar.
+function songHit(type, vol) {
+  if (song.phase !== 'play' || song.pos >= song.mine.length) return null;
+  var st = song.mine[song.pos], good = type === pn(st[0]).ty;
+  song.round[song.pos] = good; song.pos++;
+  if (good) play('pluck:' + NOTE[st[1]], Math.max(0.6, vol)); else play('buzz', 0.5);
+  if (song.lead) { song.total++; if (good) song.ok++; if (inRhythm()) song.rh++; checkPhrase(); }
+  else { tx({ k: 'sh', id: song.id, ph: song.ph, g: good ? 1 : 0, left: song.mine.length - song.pos }); renderSong(); }
+  return good;
+}
+// Ana telefon: iki elin de bölümü bitirdiğini görünce sonraki bölüme geçer.
+function checkPhrase() {
+  if (!song || !song.lead || song.phase !== 'play') return;
+  if (song.pos >= song.mine.length) {
+    if (song.rem <= 0) { nextPhrase(); return; }
+    if (!song.wait) {
+      var id = song.id, at = song.ph;
+      song.wait = setTimeout(function () { if (song && song.id === id && song.ph === at) nextPhrase(); }, 8000);
+    }
+  }
   renderSong();
 }
-function songHit(hand, type, vol) {
-  if (song.phase !== 'play') return null;
-  var ph = SONGS[song.i].phrases[song.ph], st = ph[song.pos], need = pn(st[0]);
-  var good = type === need.ty && (!link.ok || hand === need.h);
-  song.total++; song.round[song.pos] = good;
-  if (good) { song.ok++; play('pluck:' + NOTE[st[1]], Math.max(0.6, vol)); } else play('buzz', 0.5);
-  if (inRhythm()) song.rh++;
-  song.pos++;
-  if (song.pos >= ph.length) {
-    song.ph++;
-    if (song.ph >= SONGS[song.i].phrases.length) { endSong(true); return good; }
-    callPhrase();
-  } else renderSong();
-  return good;
+function nextPhrase() {
+  clearTimeout(song.wait); song.wait = null; song.ph++;
+  if (song.ph >= SONGS[song.i].phrases.length) endSong(true); else callPhrase();
 }
 function endSong(finished) {
   if (!song) return;
-  if (finished) {
-    var pct = Math.round(song.ok / song.total * 100);
+  var lead = song.lead;
+  clearTimeout(song.wait);
+  if (finished && lead) {
+    var pct = song.total ? Math.round(song.ok / song.total * 100) : 0;
     if (S.best[song.i] == null || pct > S.best[song.i]) { S.best[song.i] = pct; save(); }
-    say(SONGS[song.i].n + ' bitti: %' + pct + ' doğru, ' + song.rh + ' / ' + song.total + ' vuruş ritimde.', pct >= 80);
+    say(SONGS[song.i].n + ' bitti: %' + pct + ' doğru (' + song.ok + ' / ' + song.total + ').', pct >= 80);
     speak('Bitti. Yüzde ' + pct + '.'); play('bell:880', 0.6);
     $('lockBig').textContent = '%' + pct; $('lockSub').textContent = 'şarkı bitti';
+    if (link.ok) tx({ k: 'end', id: song.id, pct: pct });
+  } else if (lead && link.ok) tx({ k: 'stop', id: song.id });
+  song = null; if (lead) setBeat(false); renderSong();
+}
+// İkinci telefon: ana telefondan gelen şarkı mesajları.
+function followSong(d) {
+  if (d.k === 'song') {
+    stopModes(); cal = null; tst = null;
+    song = { i: d.i, ph: 0, pos: 0, ok: 0, total: 0, rh: 0, phase: 'call', round: [], mine: [], rem: 0, wait: null, lead: false, id: d.id };
+    song.mine = mySteps(phrase());
+    say(running ? 'Şarkı başladı. Kendi elinin yumruklarını at.' : 'Şarkı başladı ama bu telefonda BAŞLAT\'a basılmamış.', running); renderSong(); return;
   }
-  song = null; setBeat(false); renderSong();
+  if (!song || song.lead || song.id !== d.id) return;
+  if (d.k === 'ph') {
+    if (d.ph !== song.ph || d.phase === 'call') { song.ph = d.ph; song.pos = 0; song.round = []; song.mine = mySteps(phrase()); }
+    song.phase = d.phase; renderSong();
+  } else if (d.k === 'end') {
+    say('Şarkı bitti: %' + d.pct + ' doğru.', d.pct >= 80); $('lockBig').textContent = '%' + d.pct; $('lockSub').textContent = 'şarkı bitti';
+    song = null; renderSong();
+  } else if (d.k === 'stop') { song = null; renderSong(); }
 }
 
 /* ---------- dersler ---------- */
@@ -618,65 +660,85 @@ function endLesson(finished) {
 }
 
 /* ---------- iki telefon bağlantısı ---------- */
+// Mesajlar herkese açık aktarma sunucularından geçer; iki telefonun aynı ağda olması gerekmez.
+// Gecikme sesi etkilemesin diye her telefon kendi notasını kendisi çalar.
+var BROKERS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt'];
+function newLink() { return { role: null, code: null, mq: [], up: 0, ok: false, err: null, rtt: [], other: null, got: 0, last: 0, seen: {}, nseen: 0, seq: 0, me: Math.random().toString(36).slice(2, 8) }; }
+function topic(to) { return 'vurus-m4rt3/' + link.code + '/' + to; }
+function tx(d) {
+  d.m = link.me + '-' + (++link.seq);
+  var s = JSON.stringify(d), t = topic(link.role === 'host' ? 'j' : 'h');
+  link.mq.forEach(function (c) { try { if (c.connected) c.publish(t, s, { qos: 1 }); } catch (e) {} });
+}
+function hello(re) { tx({ k: 'hello', h: S.hand, n: S.ex.length, re: re ? 1 : 0 }); }
+function linkDown() { if (!link.ok) return; link.ok = false; if (song) { song.lead ? endSong(false) : (song = null); } renderLink(); renderSong(); }
 function linkClose() {
-  try { if (link.conn) link.conn.close(); } catch (e) {}
-  try { if (link.peer) link.peer.destroy(); } catch (e) {}
-  link = { role: null, peer: null, conn: null, code: null, ok: false, err: null, rtt: [], other: null, got: 0 };
-  renderLink();
+  var wasOk = link.ok;
+  link.mq.forEach(function (c) { try { c.end(true); } catch (e) {} });
+  if (wasOk && song) { song.lead ? endSong(false) : (song = null); }
+  link = newLink(); renderLink(); renderSong();
 }
-function linkErr(e) {
-  var m = String((e && (e.type || e.message)) || e);
-  if (m === 'peer-unavailable') m = 'bu kodla açık bir ana telefon bulunamadı';
-  else if (m === 'network' || m === 'server-error' || m === 'socket-error') m = 'bağlantı sunucusuna ulaşılamadı, interneti kontrol et';
-  link.err = m; renderLink();
-}
-function linkHost() {
-  if (typeof Peer === 'undefined') { linkErr('bağlantı kitaplığı yüklenemedi, internet bağlantısını kontrol et'); return; }
-  linkClose(); link.role = 'host'; link.code = String(Math.floor(1000 + Math.random() * 9000));
-  var p = new Peer('vurus-' + link.code); link.peer = p;
-  p.on('open', renderLink); p.on('error', linkErr);
-  p.on('connection', function (c) { link.conn = c; wire(c); });
-  renderLink();
-}
-function linkJoin(code) {
-  if (typeof Peer === 'undefined') { linkErr('bağlantı kitaplığı yüklenemedi, internet bağlantısını kontrol et'); return; }
-  if (!/^\d{4}$/.test(code)) { linkClose(); linkErr('kod 4 haneli olmalı'); return; }
-  linkClose(); link.role = 'join'; link.code = code;
-  var p = new Peer(); link.peer = p;
-  p.on('error', linkErr);
-  p.on('open', function () { var c = p.connect('vurus-' + code, { serialization: 'json' }); link.conn = c; wire(c); });
-  renderLink();
-}
-function wire(c) {
-  c.on('open', function () {
-    link.ok = true; link.err = null; stopModes();
-    try { c.send({ k: 'hello', h: S.hand, n: S.ex.length }); } catch (e) {}
-    renderLink(); renderSong();
+function linkStart(role, code) {
+  linkClose();
+  if (typeof mqtt === 'undefined') { link.err = 'bağlantı kitaplığı yüklenemedi, interneti kontrol edip sayfayı yenile'; renderLink(); return; }
+  if (!/^\d{4}$/.test(code)) { link.err = 'kod 4 haneli olmalı'; renderLink(); return; }
+  link.role = role; link.code = code;
+  var cur = link;
+  BROKERS.forEach(function (url) {
+    var c;
+    try { c = mqtt.connect(url, { clientId: 'v' + cur.me + Math.random().toString(16).slice(2, 8), keepalive: 20, reconnectPeriod: 2000, connectTimeout: 8000, clean: true }); } catch (e) { return; }
+    cur.mq.push(c);
+    var count = function () { if (link !== cur) return; link.up = link.mq.filter(function (x) { return x.connected; }).length; renderLink(); };
+    c.on('connect', function () { if (link !== cur) return; c.subscribe(topic(role === 'host' ? 'h' : 'j'), { qos: 1 }); count(); if (role === 'join') hello(); });
+    c.on('close', count); c.on('error', function () {});
+    c.on('message', function (t, p) {
+      if (link !== cur) return;
+      var d; try { d = JSON.parse(p.toString()); } catch (e) { return; }
+      if (!d || !d.m || !d.k || link.seen[d.m]) return;
+      link.seen[d.m] = 1; if (++link.nseen > 3000) { link.seen = {}; link.nseen = 0; }
+      onData(d);
+    });
   });
-  c.on('data', onData);
-  c.on('close', function () { link.ok = false; if (song) endSong(false); renderLink(); renderSong(); });
-  c.on('error', linkErr);
+  renderLink();
 }
 function onData(d) {
-  if (!d || !d.k) return;
-  if (d.k === 'hello') { link.other = { h: d.h, n: d.n }; renderLink(); }
-  else if (d.k === 'ping') { try { link.conn.send({ k: 'pong', t: d.t }); } catch (e) {} }
+  link.last = performance.now();
+  if (!link.ok && d.k !== 'hello') { link.ok = true; renderLink(); renderSong(); }
+  if (d.k === 'hello') {
+    link.other = { h: d.h, n: d.n };
+    if (!link.ok) { link.ok = true; stopModes(); }
+    if (link.role === 'host' && !d.re) hello(true);
+    renderLink(); renderSong();
+  }
+  else if (d.k === 'ping') tx({ k: 'pong', t: d.t });
   else if (d.k === 'pong') { link.rtt.push(performance.now() - d.t); if (link.rtt.length > 30) link.rtt.shift(); }
-  else if (d.k === 'hit' && link.role === 'host') { link.got++; if (!cal && !tst && running) handleHit(d.h, d.ty, d.s); }
+  else if (d.k === 'hit') link.got++;
+  else if (d.k === 'sh') {
+    link.got++;
+    if (song && song.lead && d.id === song.id && d.ph === song.ph) { song.total++; if (d.g) song.ok++; song.rem = d.left; checkPhrase(); }
+  }
+  else if (link.role === 'join' && (d.k === 'song' || d.k === 'ph' || d.k === 'end' || d.k === 'stop')) followSong(d);
 }
 setInterval(function () {
-  if (link.ok && link.role === 'host') { try { link.conn.send({ k: 'ping', t: performance.now() }); } catch (e) {} }
+  if (!link.role) return;
+  if (link.role === 'join' && !link.ok && link.up) hello();
+  if (link.role === 'host' && link.ok) tx({ k: 'ping', t: performance.now() });
+  if (link.ok && performance.now() - link.last > 10000) linkDown();
 }, 2000);
 function renderLink() {
   var h = '';
   if (!link.role) h = 'Bağlı değil. Bu telefon tek başına çalışıyor.';
-  else if (link.role === 'host') {
-    h = '<b>Ana telefon.</b> Kod: <span style="font-size:28px;font-weight:800;letter-spacing:.15em">' + link.code + '</span><br>' +
-      (link.ok ? 'İkinci telefon bağlandı.' : 'İkinci telefonda "Koda bağlan"a basıp bu kodu gir.');
-  } else h = '<b>İkinci telefon.</b> Kod: ' + link.code + '<br>' + (link.ok ? 'Bağlandı. Ses ana telefondan çıkar.' : 'Bağlanıyor…');
+  else {
+    h = link.role === 'host'
+      ? '<b>Ana telefon.</b> Kod: <span style="font-size:28px;font-weight:800;letter-spacing:.15em">' + link.code + '</span><br>'
+      : '<b>İkinci telefon.</b> Kod: ' + link.code + '<br>';
+    if (!link.up) h += 'Sunucuya bağlanılıyor…';
+    else if (!link.ok) h += link.role === 'host' ? 'Hazır. İkinci telefonda "Koda bağlan"a basıp bu kodu gir.' : 'Ana telefon aranıyor… Kodun doğru olduğundan ve ana telefonda bu sayfanın açık olduğundan emin ol.';
+    else h += 'Bağlandı. Her telefon kendi elinin sesini çalar.';
+  }
   if (link.ok && link.other) {
     h += '<br>Karşı telefon: ' + handName(link.other.h) + ' el, ' + link.other.n + ' öğretilmiş örnek.';
-    if (link.other.h === S.hand) h += '<br><span style="color:var(--bad)">İki telefonda da aynı el seçili. Birini değiştir.</span>';
+    if (link.other.h === S.hand) h += '<br><span style="color:var(--bad)">İki telefonda da aynı el seçili. Birinde Çal sekmesinden eli değiştir.</span>';
     if (!link.other.n) h += '<br><span style="color:var(--bad)">Karşı telefonda yumruklar öğretilmemiş.</span>';
   }
   if (link.err) h += '<br><span style="color:var(--bad)">Hata: ' + link.err + '</span>';
@@ -755,7 +817,7 @@ Object.keys(PACKS).forEach(function (id) {
 each($('hands').children, function (b) {
   b.addEventListener('click', function () {
     S.hand = b.getAttribute('data-v'); save(); renderChoices(); play(PACKS[S.pack][S.hand][0], 0.7);
-    if (link.ok) { try { link.conn.send({ k: 'hello', h: S.hand, n: S.ex.length }); } catch (e) {} renderLink(); }
+    if (link.ok) { hello(true); renderLink(); }
   });
 });
 function setTh(v) { S.th = v; cfg.threshold = v; $('th').value = v; $('thv').textContent = v; $('tick').style.left = Math.min(100, v / 60 * 100) + '%'; }
@@ -772,17 +834,17 @@ $('lStop').addEventListener('click', function () { endLesson(false); });
 $('sStop').addEventListener('click', function () { endSong(false); });
 $('callBtn').addEventListener('click', function () { S.call = !S.call; save(); renderSong(); });
 $('testBtn').addEventListener('click', testBegin);
-$('hostBtn').addEventListener('click', function () { $('joinRow').hidden = true; linkHost(); });
+$('hostBtn').addEventListener('click', function () { $('joinRow').hidden = true; linkStart('host', String(Math.floor(1000 + Math.random() * 9000))); });
 $('joinBtn').addEventListener('click', function () { $('joinRow').hidden = false; $('code').focus(); });
-$('joinGo').addEventListener('click', function () { linkJoin($('code').value.trim()); });
+$('joinGo').addEventListener('click', function () { linkStart('join', $('code').value.trim()); });
 $('linkOff').addEventListener('click', linkClose);
 $('copy').addEventListener('click', function () {
   var s = stats(), f = function (v) { return v === null ? '?' : v.toFixed(1); }, J = JSON.stringify, T = S.test;
-  var txt = 'Vuruş v0.3 raporu\n' +
+  var txt = 'Vuruş v0.4 raporu\n' +
     'cihaz: ' + navigator.userAgent.replace(/^.*?\((.*?)\).*$/, '$1') + '\n' +
     'el: ' + S.hand + ' | paket: ' + S.pack + ' | eşik: ' + S.th + '\n' +
     'sensör aralığı: ' + f(s.int) + ' ms | ses çıkışı: ' + f(s.out) + ' ms | jiroskop: ' + (gyro ? 'var' : 'yok') + ' | kaynak: ' + src + '\n' +
-    'bağlantı: ' + (link.role || 'yok') + (link.ok ? ' bağlı' : '') + ' | gidiş-dönüş: ' + f(s.rtt) + ' ms | gelen yumruk: ' + link.got +
+    'bağlantı: ' + (link.role || 'yok') + (link.ok ? ' bağlı' : '') + ' | sunucu: ' + link.up + '/' + BROKERS.length + ' | gidiş-dönüş: ' + f(s.rtt) + ' ms | gelen yumruk: ' + link.got +
     (link.other ? ' | karşı el: ' + link.other.h : '') + (link.err ? ' | hata: ' + link.err : '') + '\n' +
     'öğretme: ' + S.ex.length + ' örnek | ayırt etme: ' + (S.acc == null ? '-' : Math.round(S.acc * 100) + '%') +
     ' | karışıklık: ' + J(S.conf || []) + ' | atılan aykırı: ' + (S.drop || 0) + '\n' +
