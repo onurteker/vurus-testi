@@ -314,16 +314,23 @@ function recalc() {
   game.combo = combo; game.score = score; game.maxCombo = mx; game.cnt = c; game.mult = 1 + Math.min(3, Math.floor(combo / 8)); hud();
 }
 function hud() { $('hScore').firstChild.nodeValue = game.score; $('hC').textContent = game.combo; $('hM').textContent = 'kombo · ×' + game.mult; }
-function frame() {
-  if (!game || game.done) return;
+// Kaçan notaları işaretler, şarkı bitince sonucu açar. Ekran görünmüyorsa da çalışsın diye zamanlayıcıdan da çağrılır.
+function tick() {
+  if (!game || game.done) return false;
   var now = performance.now(), t = now - game.t0, grace = game.mode === 'tap' ? 270 : 1300, ch = false;
   game.notes.forEach(function (n) { if (!n.st && t > n.t + grace) { n.st = 'miss'; ch = true; game.pop = { st: 'miss', at: now }; } });
   if (ch) recalc();
+  if (t > game.len + 1800) { finish(false); return false; }
+  return true;
+}
+function frame() {
+  if (!tick()) return;
+  var now = performance.now(), t = now - game.t0;
   draw(now, t);
   $('prog').style.width = Math.max(0, Math.min(100, t / game.len * 100)) + '%';
-  if (t > game.len + 1800) { finish(false); return; }
   raf = requestAnimationFrame(frame);
 }
+setInterval(tick, 400);
 function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 var COL = { L: '#ff4d6d', R: '#3da5ff' }, POP = { perfect: ['MÜKEMMEL', '#3ddc97'], good: ['İYİ', '#ffb020'], wrong: ['YANLIŞ YUMRUK', '#ff6b6b'], miss: ['KAÇTI', '#98a2ab'] };
 function laneBox() { var W = cv.width, H = cv.height, n = game.lanes.length, lw = Math.min(W / n, H * 0.24); return { lw: lw, x0: (W - lw * n) / 2, hy: H * 0.8 }; }
