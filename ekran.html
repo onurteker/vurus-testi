@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Vuruş · Ekran</title>
+<style>
+:root{--bg:#0b0d10;--panel:#161a1f;--line:#2a3038;--ink:#f2f4f5;--dim:#98a2ab;--hit:#ffb020;--ok:#3ddc97;--bad:#ff6b6b;--L:#ff4d6d;--R:#3da5ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.4 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none}
+body{display:flex;flex-direction:column;height:100dvh}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);background:#101317}
+header b{font-size:18px}header small{color:var(--dim)}
+button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-height:40px;cursor:pointer;touch-action:manipulation}
+button:active{transform:scale(.98)}button.sel{border-color:var(--hit);color:var(--hit);font-weight:700}
+button.primary{background:var(--hit);color:#111;border:0;font-weight:800}
+button.sm{min-height:30px;padding:3px 8px;font-size:13px;border-radius:8px}
+button:disabled{opacity:.4}
+input,select{font:inherit;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px;min-height:40px}
+#code{width:84px;text-align:center;letter-spacing:.15em;font-size:17px}
+#net{color:var(--dim);font-size:13px}
+.pill{font-size:13px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--dim)}
+.pill.L.on{border-color:var(--L);color:var(--L)}.pill.R.on{border-color:var(--R);color:var(--R)}
+#tabs{margin-left:auto;display:flex;gap:6px}
+main{flex:1;min-height:0;position:relative}
+.view{position:absolute;inset:0;overflow:auto;padding:14px;display:none}.view.on{display:block}
+#v-game{padding:0;overflow:hidden}
+#menu,#result{max-width:640px;margin:0 auto;padding:18px 14px}
+h2{font-size:13px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:18px 0 8px}
+.g2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.note{color:var(--dim);font-size:14px;margin:10px 0}
+#go{width:100%;font-size:22px;min-height:64px;margin-top:16px}
+#stage{position:absolute;inset:0;display:none}#stage.on{display:block}
+#cv{width:100%;height:100%;display:block;touch-action:none}
+#hud{position:absolute;left:0;right:0;top:0;display:flex;justify-content:space-between;align-items:flex-start;padding:10px 16px;pointer-events:none;font-variant-numeric:tabular-nums}
+#hScore{font-size:34px;font-weight:800}#hCombo{font-size:34px;font-weight:800;color:var(--hit);text-align:right}
+#hud small{display:block;color:var(--dim);font-size:13px;font-weight:400}
+#prog{position:absolute;left:0;bottom:0;height:5px;background:var(--hit);width:0}
+#quit{position:absolute;right:12px;bottom:14px;opacity:.7}
+#stars{font-size:54px;letter-spacing:6px;color:var(--hit);text-align:center}
+#rScore{font-size:60px;font-weight:800;text-align:center;line-height:1.1;font-variant-numeric:tabular-nums}
+dl{margin:12px 0;display:grid;grid-template-columns:1fr auto;gap:6px 12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+dt{color:var(--dim)}dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;margin:8px 0}
+.card h3{margin:0 0 6px;font-size:16px}.card.L h3{color:var(--L)}.card.R h3{color:var(--R)}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+td,th{padding:4px 6px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--dim);font-weight:600}
+.bad{color:var(--bad)}.good{color:var(--ok)}.dim{color:var(--dim)}
+textarea{width:100%;min-height:160px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px;font:12px/1.4 ui-monospace,monospace}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#222a31;border:1px solid var(--line);padding:8px 14px;border-radius:10px;font-size:14px;display:none;z-index:5}
+</style>
+</head>
+<body>
+<header>
+  <b>Vuruş</b><small>Ekran v0.5</small>
+  <input id="code" inputmode="numeric" maxlength="4" placeholder="kod">
+  <button id="conn" class="primary">Bağlan</button>
+  <span id="net">bağlı değil</span>
+  <span class="pill L" id="pL">Sol el yok</span><span class="pill R" id="pR">Sağ el yok</span>
+  <div id="tabs"><button data-t="game" class="sel">Oyun</button><button data-t="panel">Panel</button></div>
+</header>
+<main>
+  <section class="view on" id="v-game">
+    <div id="menu">
+      <p class="note">Telefonlar bilekte, bu ekran karşında. Notalar hedef çizgisine geldiği anda o yumruğu at: doğru yumruk melodinin notasını çalar. Kırmızı sol el, mavi sağ el. Tek telefon bağlıysa yalnızca o elin üç yumruğu oynanır. Telefon yoksa 1–6 tuşlarıyla ya da şeritlere dokunarak denenebilir.</p>
+      <h2>Şarkı</h2><div class="g2" id="songs"></div>
+      <h2>Seviye</h2><div class="g3" id="lvls"></div>
+      <button id="go" class="primary">OYNA</button>
+      <p class="note" id="who"></p>
+    </div>
+    <div id="stage"><canvas id="cv"></canvas>
+      <div id="hud"><div id="hScore">0<small id="hSong"></small></div><div id="hCombo"><span id="hC">0</span><small id="hM">kombo</small></div></div>
+      <div id="prog"></div><button id="quit" class="sm">Bitir</button>
+    </div>
+    <div id="result" hidden>
+      <div id="stars"></div><div id="rScore"></div><p class="note" id="rSong" style="text-align:center"></p>
+      <dl id="rStats"></dl>
+      <div class="g3"><button id="share" class="primary">Paylaş</button><button id="again">Tekrar</button><button id="back">Menü</button></div>
+    </div>
+  </section>
+  <section class="view" id="v-panel">
+    <p class="note">Geliştirme masası. Telefonlar bilekteyken her şeyi buradan yönet: canlı vuruş akışını izle, yanlış tanınan yumruğu düzelt (düzeltme o telefona örnek olarak eklenir), etiketli seriyle başarıyı ölç, öğretmeyi ve testi uzaktan başlat. Sonunda "Rapor topla" ile her şeyi tek metinde al.</p>
+    <div class="cols" id="devCards"></div>
+    <h2>Etiketli seri</h2>
+    <div class="card">
+      <div class="btns"><select id="sDev"></select><select id="sTy"><option value="0">Direkt</option><option value="1">Kroşe</option><option value="2">Aparkat</option></select>
+        <select id="sN"><option>10</option><option>20</option></select>
+        <label><input type="checkbox" id="sLearn" checked style="min-height:0"> yanlışlardan öğren</label>
+        <button id="sGo" class="primary">Seriyi başlat</button><button id="sClr">Sonuçları sil</button></div>
+      <div id="series"></div>
+    </div>
+    <h2>Canlı vuruş akışı</h2>
+    <div class="card" style="overflow:auto"><table id="feed"></table></div>
+    <h2>Rapor</h2>
+    <div class="btns"><button id="repGo" class="primary">Rapor topla</button><button id="repCopy">Kopyala</button></div>
+    <textarea id="rep" readonly></textarea>
+  </section>
+</main>
+<div id="toast"></div>
+<script src="https://unpkg.com/mqtt@5.16.1/dist/mqtt.min.js"></script>
+<script>
+'use strict';
+var $ = function (id) { return document.getElementById(id); };
+var VER = 'v0.5', TYPES = ['Direkt', 'Kroşe', 'Aparkat'], LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90;
+function pn(n) { return { h: n % 2 ? 'L' : 'R', ty: Math.floor((n - 1) / 2) }; }
+function med(a) { if (!a.length) return 0; var s = a.slice().sort(function (p, q) { return p - q; }); return s[Math.floor(s.length / 2)]; }
+function hn(h) { return h === 'L' ? 'Sol' : 'Sağ'; }
+function toast(t) { var e = $('toast'); e.textContent = t; e.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(function () { e.style.display = 'none'; }, 2600); }
+var store = { code: '', best: {}, bias: {}, i: 0, lvl: 0 };
+try { var sv = JSON.parse(localStorage.getItem('vurus_ekran') || 'null'); if (sv) for (var k in sv) store[k] = sv[k]; } catch (e) {}
+function saveStore() { try { localStorage.setItem('vurus_ekran', JSON.stringify(store)); } catch (e) {} }
+
+/* ---------- şarkılar (kamu malı). Her nota: zaman, yumruk numarası, frekans ---------- */
+var FQ = { G3: 196, A3: 220, Bb3: 233.08, B3: 246.94, C: 261.63, D: 293.66, Eb: 311.13, E: 329.63, F: 349.23, G: 392, A: 440 };
+function ode(lvl) {
+  var q = 60000 / [72, 84, 100][lvl], notes = [], grid = [], b;
+  var A = [[0, 1, 'E'], [1, 2, 'E'], [2, 3, 'F'], [3, 2, 'G'], [4, 1, 'G'], [5, 2, 'F'], [6, 3, 'E'], [7, 2, 'D'], [8, 1, 'C'], [9, 2, 'C'], [10, 5, 'D'], [11, 2, 'E']];
+  var e1 = A.concat([[12, 1, 'E'], [13.5, 1, 'D'], [14, 2, 'D']]), e2 = A.concat([[12, 3, 'D'], [13.5, 1, 'C'], [14, 2, 'C']]);
+  var B = [[0, 1, 'D'], [1, 2, 'D'], [2, 3, 'E'], [3, 2, 'C'], [4, 1, 'D'], [5, 2, 'E'], [5.5, 3, 'F'], [6, 2, 'E'], [7, 1, 'C'], [8, 2, 'D'], [9, 1, 'E'], [9.5, 2, 'F'], [10, 3, 'E'], [11, 2, 'D'], [12, 1, 'C'], [13, 2, 'D'], [14, 5, 'G3']];
+  var lines = lvl === 0 ? [e1, e2] : [e1, e2, B, e2];
+  lines.forEach(function (ln, k) { ln.forEach(function (n) { notes.push({ t: Math.round((k * 16 + n[0]) * q), p: n[1], fq: FQ[n[2]] }); }); });
+  for (b = 0; b < lines.length * 16; b += 0.5) grid.push([Math.round(b * q), b % 1 ? 2 : (b % 2 ? 1 : 0)]);
+  return { notes: notes, grid: grid, len: Math.round(lines.length * 16 * q), beat: q };
+}
+function king(lvl) {
+  var sp = [[540, 460], [560, 450, 370], [480, 390, 320]][lvl], notes = [], grid = [], t0 = 0, s;
+  var bar = [[0, 1, 'A3'], [1, 2, 'B3'], [2, 1, 'C'], [3, 2, 'D'], [4, 5, 'E'], [5, 2, 'C'], [6, 3, 'E'],
+    [8, 2, 'Eb'], [9, 3, 'B3'], [10, 2, 'Eb'], [12, 1, 'D'], [13, 2, 'Bb3'], [14, 1, 'D'],
+    [16, 1, 'A3'], [17, 2, 'B3'], [18, 1, 'C'], [19, 2, 'D'], [20, 5, 'E'], [21, 2, 'C'], [22, 3, 'E'], [23, 2, 'A'],
+    [24, 1, 'G'], [25, 2, 'E'], [26, 3, 'C'], [27, 2, 'E'], [28, 5, 'G']];
+  sp.forEach(function (d) {
+    bar.forEach(function (n) { notes.push({ t: Math.round(t0 + n[0] * d), p: n[1], fq: FQ[n[2]] }); });
+    for (s = 0; s < 32; s++) grid.push([Math.round(t0 + s * d), s % 2 ? 2 : (s % 8 === 4 ? 1 : 0)]);
+    t0 += 32 * d;
+  });
+  return { notes: notes, grid: grid, len: Math.round(t0), beat: sp[0] * 2 };
+}
+var SONGS = [{ n: 'Neşeye Övgü', by: 'Beethoven', build: ode }, { n: 'Dağ Kralının Salonunda', by: 'Grieg', build: king }];
+
+/* ---------- ses ---------- */
+var ac = null, noise = null, bg = null;
+function initAudio() {
+  if (ac) { ac.resume(); return; }
+  var AC = window.AudioContext || window.webkitAudioContext; ac = new AC({ latencyHint: 'interactive' });
+  var len = Math.floor(ac.sampleRate * 0.5); noise = ac.createBuffer(1, len, ac.sampleRate);
+  var d = noise.getChannelData(0); for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  ac.resume();
+}
+function tone(type, f0, f1, dur, peak, t, out) {
+  var o = ac.createOscillator(), g = ac.createGain(); o.type = type;
+  o.frequency.setValueAtTime(f0, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.5);
+  g.gain.setValueAtTime(peak, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + 0.02);
+}
+function nz(freq, dur, peak, t, out) {
+  var n = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  n.buffer = noise; f.type = 'highpass'; f.frequency.value = freq;
+  g.gain.setValueAtTime(peak, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  n.connect(f); f.connect(g); g.connect(out); n.start(t); n.stop(t + dur + 0.02);
+}
+function play(def, vol, when, dest) {
+  if (!ac) return;
+  var t = Math.max(when || 0, ac.currentTime), out = ac.createGain(); out.gain.value = vol; out.connect(dest || ac.destination);
+  var p = def.split(':'), k = p[0], f = +p[1];
+  if (k === 'kick') tone('sine', 160, 45, 0.28, 1, t, out);
+  else if (k === 'snare') { nz(1200, 0.16, 0.9, t, out); tone('triangle', 190, 0, 0.09, 0.6, t, out); }
+  else if (k === 'hat') nz(7000, 0.06, 0.7, t, out);
+  else if (k === 'pluck') { tone('triangle', f, 0, 0.45, 0.8, t, out); tone('sine', f * 2, 0, 0.25, 0.25, t, out); }
+  else if (k === 'bell') { tone('sine', f, 0, 0.7, 0.6, t, out); tone('sine', f * 2, 0, 0.5, 0.25, t, out); }
+  else if (k === 'buzz') tone('square', 90, 0, 0.18, 0.35, t, out);
+  else if (k === 'tick') tone('sine', 1320, 0, 0.07, 0.5, t, out);
+}
+
+/* ---------- bağlantı ---------- */
+var BROKERS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt'];
+var me = 's' + Math.random().toString(36).slice(2, 8);
+var L = { code: null, mq: [], up: 0, seq: 0, seen: {}, nseen: 0 };
+var devs = {}, feed = [], series = {}, reports = {}, lastGame = null;
+function tx(d, q0) {
+  d.m = me + '-' + (++L.seq); d.sc = 1;
+  var s = JSON.stringify(d);
+  ['h', 'j'].forEach(function (to) { L.mq.forEach(function (c) { try { if (c.connected) c.publish('vurus-m4rt3/' + L.code + '/' + to, s, { qos: q0 ? 0 : 1 }); } catch (e) {} }); });
+}
+function cmd(to, c, args) { var d = { k: 'cmd', to: to, c: c }; for (var a in (args || {})) d[a] = args[a]; tx(d); }
+function connect(code) {
+  L.mq.forEach(function (c) { try { c.end(true); } catch (e) {} });
+  L = { code: code, mq: [], up: 0, seq: L.seq, seen: {}, nseen: 0 }; devs = {};
+  if (typeof mqtt === 'undefined') { $('net').textContent = 'bağlantı kitaplığı yüklenemedi, sayfayı yenile'; return; }
+  if (!/^\d{4}$/.test(code)) { $('net').textContent = 'kod 4 haneli olmalı'; return; }
+  store.code = code; saveStore();
+  var cur = L;
+  BROKERS.forEach(function (url) {
+    var c; try { c = mqtt.connect(url, { clientId: 'v' + me + Math.random().toString(16).slice(2, 8), keepalive: 20, reconnectPeriod: 2000, connectTimeout: 8000, clean: true }); } catch (e) { return; }
+    cur.mq.push(c);
+    var cnt = function () { if (L !== cur) return; L.up = L.mq.filter(function (x) { return x.connected; }).length; renderNet(); };
+    c.on('connect', function () { if (L !== cur) return; c.subscribe('vurus-m4rt3/' + code + '/s', { qos: 1 }); cnt(); });
+    c.on('close', cnt); c.on('error', function () {});
+    c.on('message', function (t, p) {
+      if (L !== cur) return;
+      var d; try { d = JSON.parse(p.toString()); } catch (e) { return; }
+      if (!d || !d.m || !d.k || !d.f || L.seen[d.m]) return;
+      L.seen[d.m] = 1; if (++L.nseen > 4000) { L.seen = {}; L.nseen = 0; }
+      onMsg(d);
+    });
+  });
+  renderNet();
+}
+function online() { var now = performance.now(); return Object.keys(devs).map(function (id) { return devs[id]; }).filter(function (d) { return now - d.last < 6000 && d.off != null; }); }
+function onMsg(d) {
+  var now = performance.now(), dv = devs[d.f];
+  if (!dv) dv = devs[d.f] = { id: d.f, h: d.h, rt: [], off: null, rtt: null, st: null, dts: [], last: 0 };
+  dv.h = d.h; dv.last = now;
+  if (d.k === 'sq') {
+    var rtt = now - d.t; dv.rt.push({ rtt: rtt, off: d.w - (d.t + rtt / 2) }); if (dv.rt.length > 30) dv.rt.shift();
+    var b = dv.rt.reduce(function (p, q) { return q.rtt < p.rtt ? q : p; });
+    var first = dv.off == null; dv.off = b.off; dv.rtt = b.rtt;
+    if (first) { renderNet(); renderPanel(); }
+  }
+  else if (d.k === 'st') { dv.st = d; renderPanel(); }
+  else if (d.k === 'x') {
+    d.at = now; feed.unshift(d); if (feed.length > 300) feed.pop();
+    if (d.tr != null && d.tr < 3) {
+      var sr = series[d.f] || (series[d.f] = { h: d.h, rows: [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]] });
+      sr.h = d.h; sr.rows[d.tr][d.ty < 0 || d.c > 2 ? 3 : d.c]++; renderSeries();
+    }
+    if (d.g && game && !game.done && game.devs.indexOf(dv) >= 0) judge(game.notes[d.g.i], d.g.dt, d.g.ok, d.s, dv);
+    renderFeed();
+  }
+  else if (d.k === 'rep') { reports[d.f] = d.txt; buildReport(); }
+  else if (d.k === 'ack') { if (d.msg) toast(hn(d.h) + ' el: ' + d.msg); }
+}
+setInterval(function () { if (L.up) tx({ k: 'sp', t: performance.now() }, true); renderNet(); }, 1000);
+function renderNet() {
+  $('net').textContent = !L.code ? 'bağlı değil' : !L.up ? 'sunucuya bağlanılıyor…' : 'oda ' + L.code + ' · sunucu ' + L.up + '/' + BROKERS.length;
+  var on = online();
+  ['L', 'R'].forEach(function (h) {
+    var d = on.filter(function (x) { return x.h === h; })[0], el = $('p' + h);
+    el.className = 'pill ' + h + (d ? ' on' : '');
+    el.textContent = hn(h) + ' el ' + (d ? 'bağlı · ' + Math.round(d.rtt) + ' ms' : 'yok');
+  });
+  var two = on.length > 1 && on[0].h === on[1].h;
+  $('who').textContent = two ? 'İki telefonda da aynı el seçili. Birinde eli değiştir.' : on.length === 2 ? 'İki el bağlı: altı yumrukla oynanır.' : on.length === 1 ? 'Yalnızca ' + hn(on[0].h).toLowerCase() + ' el bağlı: o elin üç yumruğuyla oynanır.' : 'Telefon bağlı değil: 1–6 tuşları ya da dokunmayla deneme modu.';
+  var sd = $('sDev'), cur = sd.value, opts = on.map(function (d) { return '<option value="' + d.id + '">' + hn(d.h) + ' el</option>'; }).join('');
+  if (opts !== renderNet.opts) { renderNet.opts = opts; sd.innerHTML = opts; if (cur) sd.value = cur; }
+}
+
+/* ---------- oyun ---------- */
+var game = null, raf = 0, sel = { i: store.i || 0, lvl: store.lvl || 0 };
+var cv = $('cv'), g2 = null;
+try { g2 = cv.getContext('2d'); } catch (e) {}
+function show(w) { $('menu').hidden = w !== 'menu'; $('stage').className = w === 'stage' ? 'on' : ''; $('result').hidden = w !== 'result'; if (w === 'stage') size(); }
+function size() { var r = window.devicePixelRatio || 1; cv.width = Math.round(cv.clientWidth * r) || 800; cv.height = Math.round(cv.clientHeight * r) || 600; }
+window.addEventListener('resize', size);
+function renderMenu() {
+  $('songs').innerHTML = SONGS.map(function (s, i) { var b = store.best[i + '-' + sel.lvl]; return '<button data-i="' + i + '" class="' + (i === sel.i ? 'sel' : '') + '">' + s.n + '<br><small class="dim">' + s.by + (b ? ' · en iyi ' + b : '') + '</small></button>'; }).join('');
+  $('lvls').innerHTML = LV.map(function (n, i) { return '<button data-i="' + i + '" class="' + (i === sel.lvl ? 'sel' : '') + '">' + n + '</button>'; }).join('');
+}
+$('songs').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { sel.i = +b.getAttribute('data-i'); store.i = sel.i; saveStore(); renderMenu(); } });
+$('lvls').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { sel.lvl = +b.getAttribute('data-i'); store.lvl = sel.lvl; saveStore(); renderMenu(); } });
+function startGame() {
+  initAudio();
+  var ws = online(), dl = ws.filter(function (d) { return d.h === 'L'; })[0], dr = ws.filter(function (d) { return d.h === 'R'; })[0];
+  var ch = SONGS[sel.i].build(sel.lvl), mode = dl && dr ? 'two' : ws.length ? 'one' : 'tap', one = mode === 'one' ? ws[0] : null;
+  var lanes = one ? (one.h === 'L' ? [3, 5, 1] : [2, 6, 4]) : [3, 5, 1, 2, 6, 4];
+  var notes = ch.notes.map(function (n, i) {
+    var ty = pn(n.p).ty, p = one ? ty * 2 + (one.h === 'L' ? 1 : 2) : n.p;
+    return { i: i, t: n.t, p: p, ty: ty, fq: n.fq, st: null, dt: 0, s: 0, own: one ? one.id : mode === 'two' ? (pn(p).h === 'L' ? dl.id : dr.id) : null };
+  });
+  var t0 = performance.now() + 1200 + 4 * ch.beat;
+  game = { id: me + Date.now().toString(36), i: sel.i, lvl: sel.lvl, mode: mode, lanes: lanes, notes: notes, t0: t0, len: ch.len, beat: ch.beat, fx: [], pop: null,
+    score: 0, combo: 0, maxCombo: 0, mult: 1, cnt: { perfect: 0, good: 0, wrong: 0, miss: 0 }, done: false, devs: one ? [one] : mode === 'two' ? [dl, dr] : [] };
+  if (game.devs.length) {
+    var msg = { k: 'gs', id: game.id, len: ch.len, t0: {}, n: {} };
+    game.devs.forEach(function (d) {
+      d.dts = []; msg.t0[d.id] = Math.round(t0 + d.off + (store.bias[d.h] || 0));
+      msg.n[d.id] = notes.filter(function (n) { return n.own === d.id; }).map(function (n) { return [n.i, n.t, n.ty, n.fq]; });
+    });
+    tx(msg);
+  }
+  var a0 = ac.currentTime + (t0 - performance.now()) / 1000, k;
+  bg = ac.createGain(); bg.gain.value = 1; bg.connect(ac.destination);
+  for (k = 4; k >= 1; k--) play('tick', 0.5, a0 - k * ch.beat / 1000, bg);
+  ch.grid.forEach(function (g) { play(['kick', 'snare', 'hat'][g[1]], [0.5, 0.25, 0.1][g[1]], a0 + g[0] / 1000, bg); });
+  $('hSong').textContent = SONGS[sel.i].n + ' · ' + LV[sel.lvl]; hud(); show('stage');
+  cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
+}
+// Zamanlama: telefonun bildirdiği sapmadan o elin bu oyundaki ortanca sapması düşülür (otomatik gecikme ayarı).
+function judge(note, dt, ok, s, dv) {
+  if (!note || (note.st && note.st !== 'miss')) return;
+  var a = dt;
+  if (dv) { if (ok) dv.dts.push(dt); if (dv.dts.length >= 6) a = dt - med(dv.dts); }
+  note.st = !ok ? 'wrong' : Math.abs(a) <= PERF ? 'perfect' : 'good'; note.dt = Math.round(a); note.s = s || 0;
+  var now = performance.now(); game.fx.push({ p: note.p, st: note.st, at: now }); game.pop = { st: note.st, at: now };
+  recalc();
+}
+function localHit(p) {
+  if (!game || game.done || game.mode !== 'tap') return;
+  var now = performance.now(), best = null, bd = 0;
+  game.notes.forEach(function (n) { if (n.st) return; var dt = now - (game.t0 + n.t); if (Math.abs(dt) <= 260 && (!best || Math.abs(dt) < Math.abs(bd))) { best = n; bd = dt; } });
+  if (!best) { play('tick', 0.2); return; }
+  var ok = best.p === p; play(ok ? 'pluck:' + best.fq : 'buzz', ok ? 0.8 : 0.5);
+  judge(best, bd, ok, 30, null);
+}
+function recalc() {
+  var combo = 0, score = 0, mx = 0, c = { perfect: 0, good: 0, wrong: 0, miss: 0 };
+  game.notes.forEach(function (n) {
+    if (!n.st) return; c[n.st]++;
+    if (n.st === 'perfect' || n.st === 'good') { combo++; if (combo > mx) mx = combo; score += (n.st === 'perfect' ? 100 : 60) * (1 + Math.min(3, Math.floor(combo / 8))) + Math.min(20, Math.round(n.s / 4)); }
+    else combo = 0;
+  });
+  game.combo = combo; game.score = score; game.maxCombo = mx; game.cnt = c; game.mult = 1 + Math.min(3, Math.floor(combo / 8)); hud();
+}
+function hud() { $('hScore').firstChild.nodeValue = game.score; $('hC').textContent = game.combo; $('hM').textContent = 'kombo · ×' + game.mult; }
+function frame() {
+  if (!game || game.done) return;
+  var now = performance.now(), t = now - game.t0, grace = game.mode === 'tap' ? 270 : 1300, ch = false;
+  game.notes.forEach(function (n) { if (!n.st && t > n.t + grace) { n.st = 'miss'; ch = true; game.pop = { st: 'miss', at: now }; } });
+  if (ch) recalc();
+  draw(now, t);
+  $('prog').style.width = Math.max(0, Math.min(100, t / game.len * 100)) + '%';
+  if (t > game.len + 1800) { finish(false); return; }
+  raf = requestAnimationFrame(frame);
+}
+function rr(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+var COL = { L: '#ff4d6d', R: '#3da5ff' }, POP = { perfect: ['MÜKEMMEL', '#3ddc97'], good: ['İYİ', '#ffb020'], wrong: ['YANLIŞ YUMRUK', '#ff6b6b'], miss: ['KAÇTI', '#98a2ab'] };
+function laneBox() { var W = cv.width, H = cv.height, n = game.lanes.length, lw = Math.min(W / n, H * 0.24); return { lw: lw, x0: (W - lw * n) / 2, hy: H * 0.8 }; }
+function draw(now, t) {
+  var g = g2; if (!g) return;
+  var W = cv.width, H = cv.height, bx = laneBox(), lw = bx.lw, x0 = bx.x0, hy = bx.hy, LA = 2200, F = 'px system-ui,-apple-system,"Segoe UI",sans-serif';
+  var ph = ((t % game.beat) + game.beat) % game.beat / game.beat;
+  g.clearRect(0, 0, W, H); g.textAlign = 'center'; g.textBaseline = 'middle';
+  game.lanes.forEach(function (p, k) {
+    var x = x0 + k * lw, col = COL[pn(p).h];
+    g.fillStyle = k % 2 ? 'rgba(255,255,255,.03)' : 'rgba(255,255,255,.055)'; g.fillRect(x, 0, lw, H);
+    g.globalAlpha = 0.95 - 0.45 * ph; g.strokeStyle = col; g.lineWidth = Math.max(3, lw * 0.045);
+    rr(g, x + lw * 0.1, hy - lw * 0.26, lw * 0.8, lw * 0.52, lw * 0.13); g.stroke(); g.globalAlpha = 1;
+    g.fillStyle = col; g.font = '700 ' + Math.round(lw * 0.15) + F; g.fillText(p + ' ' + TYPES[pn(p).ty].toLowerCase(), x + lw / 2, hy + lw * 0.5);
+  });
+  game.notes.forEach(function (n) {
+    var dt = n.t - t; if (dt > LA || dt < -600 || n.st === 'perfect' || n.st === 'good') return;
+    var k = game.lanes.indexOf(n.p); if (k < 0) return;
+    var x = x0 + k * lw, y = hy - dt / LA * hy;
+    g.globalAlpha = n.st ? 0.22 : 1; g.fillStyle = COL[pn(n.p).h]; rr(g, x + lw * 0.12, y - lw * 0.23, lw * 0.76, lw * 0.46, lw * 0.12); g.fill();
+    g.fillStyle = '#fff'; g.font = '800 ' + Math.round(lw * 0.32) + F; g.fillText(n.p, x + lw / 2, y + lw * 0.02); g.globalAlpha = 1;
+  });
+  game.fx = game.fx.filter(function (f) { return now - f.at < 450; });
+  game.fx.forEach(function (f) {
+    var k = game.lanes.indexOf(f.p), a = (now - f.at) / 450; if (k < 0) return;
+    g.globalAlpha = 1 - a; g.strokeStyle = POP[f.st][1]; g.lineWidth = lw * 0.07 * (1 - a) + 2;
+    g.beginPath(); g.arc(x0 + k * lw + lw / 2, hy, lw * (0.3 + 0.5 * a), 0, 6.283); g.stroke(); g.globalAlpha = 1;
+  });
+  if (game.pop && now - game.pop.at < 600) {
+    var pa = (now - game.pop.at) / 600; g.globalAlpha = 1 - pa; g.fillStyle = POP[game.pop.st][1];
+    g.font = '800 ' + Math.round(H * 0.07) + F; g.fillText(POP[game.pop.st][0], W / 2, H * 0.4 - pa * H * 0.04); g.globalAlpha = 1;
+  }
+  if (t < 0) { g.fillStyle = '#fff'; g.font = '800 ' + Math.round(H * 0.2) + F; g.fillText(Math.min(4, Math.ceil(-t / game.beat)), W / 2, H * 0.4); }
+}
+function finish(aborted) {
+  if (!game) return;
+  cancelAnimationFrame(raf);
+  if (bg) { try { bg.gain.value = 0; bg.disconnect(); } catch (e) {} bg = null; }
+  if (game.devs.length) tx({ k: 'ge', id: game.id });
+  if (aborted) { game = null; show('menu'); return; }
+  game.done = true; recalc();
+  var N = game.notes.length, c = game.cnt, ratio = (c.perfect + 0.6 * c.good) / N;
+  var stars = ratio >= 0.95 ? 5 : ratio >= 0.85 ? 4 : ratio >= 0.7 ? 3 : ratio >= 0.5 ? 2 : ratio > 0 ? 1 : 0;
+  var hit = game.notes.filter(function (n) { return n.st === 'perfect' || n.st === 'good'; });
+  var pow = hit.length ? Math.round(hit.reduce(function (s, n) { return s + n.s; }, 0) / hit.length) : 0;
+  var tm = game.devs.map(function (d) { var m = d.dts.length ? Math.round(med(d.dts)) : 0; if (d.dts.length >= 6) store.bias[d.h] = Math.round((store.bias[d.h] || 0) + m); return { h: d.h, med: m, n: d.dts.length }; });
+  var key = game.i + '-' + game.lvl, rec = !(store.best[key] >= game.score) && game.score > 0; if (rec) store.best[key] = game.score; saveStore();
+  lastGame = { song: SONGS[game.i].n, lvl: LV[game.lvl], mode: game.mode, score: game.score, stars: stars, acc: Math.round((c.perfect + c.good) / N * 100), cnt: c, n: N, combo: game.maxCombo, pow: pow, timing: tm, rec: rec,
+    spread: Math.round(med(hit.map(function (n) { return Math.abs(n.dt); }))) };
+  $('stars').textContent = '★★★★★'.slice(0, stars) + '☆☆☆☆☆'.slice(0, 5 - stars);
+  $('rScore').textContent = game.score; $('rSong').textContent = lastGame.song + ' · ' + lastGame.lvl + (rec ? ' · yeni rekor' : '');
+  $('rStats').innerHTML = [['İsabet', '%' + lastGame.acc], ['Mükemmel / iyi', c.perfect + ' / ' + c.good], ['Yanlış yumruk / kaçan', c.wrong + ' / ' + c.miss], ['En uzun kombo', game.maxCombo], ['Ortalama güç', pow ? pow + ' m/s²' : '–'], ['Zamanlama (ortanca sapma)', lastGame.spread + ' ms']]
+    .map(function (r) { return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('');
+  play('bell:880', 0.5); show('result'); renderMenu();
+}
+function card() {
+  var c = document.createElement('canvas'); c.width = 1080; c.height = 1080; var g = c.getContext('2d'), r = lastGame;
+  var gr = g.createLinearGradient(0, 0, 1080, 1080); gr.addColorStop(0, '#1b0d14'); gr.addColorStop(0.5, '#0b0d10'); gr.addColorStop(1, '#0a1622'); g.fillStyle = gr; g.fillRect(0, 0, 1080, 1080);
+  g.fillStyle = '#ff4d6d'; g.fillRect(0, 0, 14, 1080); g.fillStyle = '#3da5ff'; g.fillRect(1066, 0, 14, 1080);
+  g.textAlign = 'center'; g.fillStyle = '#f2f4f5'; g.font = '800 64px system-ui,sans-serif'; g.fillText('VURUŞ', 540, 130);
+  g.fillStyle = '#98a2ab'; g.font = '500 40px system-ui,sans-serif'; g.fillText(r.song + ' · ' + r.lvl, 540, 200);
+  g.fillStyle = '#ffb020'; g.font = '800 120px system-ui,sans-serif'; g.fillText('★★★★★'.slice(0, r.stars) + '☆☆☆☆☆'.slice(0, 5 - r.stars), 540, 400);
+  g.fillStyle = '#fff'; g.font = '800 220px system-ui,sans-serif'; g.fillText(r.score, 540, 640);
+  g.fillStyle = '#98a2ab'; g.font = '500 44px system-ui,sans-serif'; g.fillText('isabet %' + r.acc + '  ·  kombo ' + r.combo + (r.pow ? '  ·  güç ' + r.pow : ''), 540, 760);
+  g.fillStyle = '#f2f4f5'; g.font = '700 48px system-ui,sans-serif'; g.fillText('Bu şarkıyı yumruklarımla çaldım.', 540, 930);
+  return c;
+}
+$('share').addEventListener('click', function () {
+  card().toBlob(function (b) {
+    var f = new File([b], 'vurus-skor.png', { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [f] })) navigator.share({ files: [f], text: lastGame.song + ': ' + lastGame.score + ' puan' }).catch(function () {});
+    else { var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'vurus-skor.png'; a.click(); toast('Skor kartı indirildi.'); }
+  });
+});
+$('go').addEventListener('click', startGame); $('again').addEventListener('click', startGame);
+$('back').addEventListener('click', function () { show('menu'); }); $('quit').addEventListener('click', function () { finish(true); });
+window.addEventListener('keydown', function (e) { if (e.key >= '1' && e.key <= '6') localHit(+e.key); });
+cv.addEventListener('pointerdown', function (e) {
+  if (!game || game.mode !== 'tap') return;
+  var r = cv.getBoundingClientRect(), x = (e.clientX - r.left) * (cv.width / r.width), bx = laneBox(), k = Math.floor((x - bx.x0) / bx.lw);
+  if (k >= 0 && k < game.lanes.length) localHit(game.lanes[k]);
+});
+
+/* ---------- kontrol paneli ---------- */
+function renderPanel() {
+  var now = performance.now(), ids = Object.keys(devs);
+  $('devCards').innerHTML = ids.length ? ids.map(function (id) {
+    var d = devs[id], s = d.st, on = now - d.last < 6000, h = '<div class="card ' + d.h + '"><h3>' + hn(d.h) + ' el ' + (on ? '' : '<span class="bad">· bağlantı yok</span>') + '</h3>';
+    if (!s) return h + '<span class="dim">durum bekleniyor…</span></div>';
+    var t = s.test, tt = t ? t.conf.map(function (r, i) { return r[i] + '/' + (r[0] + r[1] + r[2]); }).join(' ') + ' · gard ' + t.fa : 'yapılmadı';
+    h += '<div>' + (s.run ? '<span class="good">çalışıyor</span>' : '<span class="bad">BAŞLAT\'a basılmamış</span>') + (s.busy ? ' · <b>' + s.busy + '</b>' : '') + ' · ' + s.v + '</div>' +
+      '<div>Örnek: direkt ' + s.n[0] + ', kroşe ' + s.n[1] + ', aparkat ' + s.n[2] + ', gard ' + s.n[3] + ' · kendi sınaması ' + (s.acc == null ? '–' : '%' + s.acc) + '</div>' +
+      '<div>Doğrulama testi: ' + tt + '</div>' +
+      '<div class="dim">Vuruş ' + s.cnt + ' (tanınmadı ' + s.rejN + ') · sensör ' + (s.int ? s.int.toFixed(0) : '?') + ' ms · ağ ' + (d.rtt == null ? '?' : Math.round(d.rtt)) + ' ms · oyun gecikme ayarı ' + (store.bias[d.h] || 0) + ' ms</div>' +
+      '<div class="btns">Eşik <button class="sm" data-c="th" data-v="' + (s.th - 1) + '">−</button><b>' + s.th + '</b><button class="sm" data-c="th" data-v="' + (s.th + 1) + '">+</button>' +
+      ' Tanımama <button class="sm" data-c="rej" data-v="' + (Math.round(s.rej * 10) - 1) / 10 + '">−</button><b>' + (s.rej > 0 ? s.rej.toFixed(1) : 'kapalı') + '</b><button class="sm" data-c="rej" data-v="' + (Math.round(s.rej * 10) + 1) / 10 + '">+</button></div>' +
+      '<div class="btns"><button class="sm" data-c="teach">Baştan öğret</button><button class="sm" data-c="teach" data-ty="0">+5 direkt</button><button class="sm" data-c="teach" data-ty="1">+5 kroşe</button><button class="sm" data-c="teach" data-ty="2">+5 aparkat</button>' +
+      '<button class="sm" data-c="neg">Gard örneği (20 sn)</button><button class="sm" data-c="test">Doğrulama testi</button><button class="sm" data-c="prune">Aykırıları at</button><button class="sm" data-c="clrneg">Gard örneklerini sil</button><button class="sm" data-c="stop">Durdur</button></div>';
+    return h.replace(/data-c=/g, 'data-id="' + id + '" data-c=') + '</div>';
+  }).join('') : '<div class="card dim">Henüz telefon yok. Telefonda Bağlan sekmesinden "Ana telefon ol"a bas, oradaki kodu yukarıya gir.</div>';
+}
+$('devCards').addEventListener('click', function (e) {
+  var b = e.target.closest('button[data-c]'); if (!b) return;
+  var c = b.getAttribute('data-c'), id = b.getAttribute('data-id'), a = {};
+  if (c === 'th' || c === 'rej') a.v = +b.getAttribute('data-v');
+  if (c === 'teach' && b.hasAttribute('data-ty')) { a.ty = +b.getAttribute('data-ty'); a.n = 5; a.keep = 1; }
+  if (c === 'teach' && !b.hasAttribute('data-ty') && !confirm('Bu telefondaki öğretilmiş örnekler silinip baştan öğretilecek. Emin misin?')) return;
+  cmd(id, c, a);
+});
+function renderSeries() {
+  var ids = Object.keys(series);
+  $('series').innerHTML = ids.map(function (id) {
+    var s = series[id], tot = 0, ok = 0;
+    var rows = s.rows.map(function (r, i) { var n = r[0] + r[1] + r[2] + r[3]; tot += n; ok += r[i]; return n ? '<tr><td>' + TYPES[i] + '</td>' + r.map(function (v, j) { return '<td class="' + (j === i ? 'good' : v ? 'bad' : 'dim') + '">' + v + '</td>'; }).join('') + '<td>' + Math.round(r[i] / n * 100) + '%</td></tr>' : ''; }).join('');
+    return '<h3 style="margin:12px 0 4px">' + hn(s.h) + ' el · ' + ok + ' / ' + tot + ' doğru (%' + (tot ? Math.round(ok / tot * 100) : 0) + ')</h3><table><tr><th>atılan</th><th>direkt</th><th>kroşe</th><th>aparkat</th><th>tanınmadı</th><th>başarı</th></tr>' + rows + '</table>';
+  }).join('');
+}
+$('sGo').addEventListener('click', function () { var id = $('sDev').value; if (!id) { toast('Önce bir telefon bağla.'); return; } cmd(id, 'label', { ty: +$('sTy').value, n: +$('sN').value, learn: $('sLearn').checked ? 1 : 0 }); });
+$('sClr').addEventListener('click', function () { series = {}; renderSeries(); });
+function renderFeed() {
+  var now = performance.now();
+  $('feed').innerHTML = '<tr><th>el</th><th>tanınan</th><th>uzaklık</th><th>d / k / a / gard</th><th>şiddet</th><th>seri</th><th>oyun</th><th>doğrusu neydi?</th></tr>' + feed.slice(0, 30).map(function (x) {
+    var nm = x.ty < 0 ? (x.c > 2 ? 'gard' : 'tanınmadı (' + TYPES[x.c].toLowerCase() + '?)') : TYPES[x.ty].toLowerCase();
+    var tr = x.tr == null ? '' : x.tr > 2 ? 'gard' : TYPES[x.tr].toLowerCase(), bad = x.tr != null && (x.tr > 2 ? x.ty >= 0 : x.ty !== x.tr);
+    var gm = x.g ? (x.g.ok ? '' : 'yanlış ') + (x.g.dt > 0 ? '+' : '') + x.g.dt + ' ms' : '';
+    var fx = [0, 1, 2, 3].map(function (c) { return '<button class="sm" data-id="' + x.f + '" data-hid="' + x.hid + '" data-ty="' + c + '">' + (c < 3 ? TYPES[c][0] : 'yumruk değil') + '</button>'; }).join(' ');
+    return '<tr><td style="color:var(--' + x.h + ')">' + hn(x.h) + '</td><td class="' + (bad ? 'bad' : '') + '">' + nm + '</td><td>' + x.d + '</td><td class="dim">' + (x.dc || []).join(' / ') + '</td><td>' + x.s + '</td><td>' + tr + '</td><td>' + gm + '</td><td>' + (now - x.at < 120000 ? fx : '') + '</td></tr>';
+  }).join('');
+}
+$('feed').addEventListener('click', function (e) {
+  var b = e.target.closest('button[data-hid]'); if (!b) return;
+  cmd(b.getAttribute('data-id'), 'fix', { hid: +b.getAttribute('data-hid'), ty: +b.getAttribute('data-ty') }); b.parentNode.innerHTML = '<span class="good">gönderildi</span>';
+});
+function buildReport() {
+  var J = JSON.stringify, t = 'Vuruş Ekran ' + VER + ' raporu\noda: ' + L.code + ' | sunucu: ' + L.up + '/' + BROKERS.length + '\n';
+  Object.keys(devs).forEach(function (id) { var d = devs[id]; t += 'cihaz ' + d.h + ': ağ ' + (d.rtt == null ? '?' : Math.round(d.rtt)) + ' ms | saat farkı ' + (d.off == null ? '?' : Math.round(d.off)) + ' | oyun gecikme ayarı ' + (store.bias[d.h] || 0) + ' ms | durum ' + J(d.st ? { run: d.st.run, n: d.st.n, acc: d.st.acc, th: d.st.th, rej: d.st.rej, test: d.st.test, cnt: d.st.cnt, rejN: d.st.rejN } : null) + '\n'; });
+  Object.keys(series).forEach(function (id) { t += 'etiketli seri ' + series[id].h + ' [atılan x direkt,kroşe,aparkat,tanınmadı]: ' + J(series[id].rows) + '\n'; });
+  if (lastGame) t += 'son oyun: ' + J(lastGame) + '\n';
+  var odd = feed.filter(function (x) { return x.ty < 0 || (x.tr != null && x.ty !== x.tr); }).slice(0, 40).map(function (x) { return [x.h, x.tr == null ? null : x.tr, x.ty, x.d, x.dc, x.s].concat(x.ft || []); });
+  t += 'sorunlu vuruşlar [el,doğrusu,tanınan,uzaklık,[sınıf uzaklıkları],şiddet,özellikler]: ' + J(odd) + '\n';
+  t += 'son vuruşlar [el,tanınan,uzaklık,şiddet,oyun sapması]: ' + J(feed.slice(0, 80).map(function (x) { return [x.h, x.ty, x.d, x.s, x.g ? x.g.dt : null]; })) + '\n';
+  Object.keys(reports).forEach(function (id) { t += '\n' + reports[id] + '\n'; });
+  $('rep').value = t;
+}
+$('repGo').addEventListener('click', function () { reports = {}; buildReport(); cmd('*', 'rep'); toast('Telefon raporları isteniyor…'); });
+$('repCopy').addEventListener('click', function () {
+  var t = $('rep').value; if (!t) { toast('Önce "Rapor topla"ya bas.'); return; }
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function () { toast('Kopyalandı. Sohbete yapıştırabilirsin.'); }).catch(function () { $('rep').select(); toast('Metni elle kopyala.'); });
+  else { $('rep').select(); toast('Metni elle kopyala.'); }
+});
+
+/* ---------- genel ---------- */
+$('tabs').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  [].forEach.call($('tabs').children, function (c) { c.className = c === b ? 'sel' : ''; });
+  ['game', 'panel'].forEach(function (v) { $('v-' + v).className = 'view' + (v === b.getAttribute('data-t') ? ' on' : ''); });
+});
+$('conn').addEventListener('click', function () { initAudio(); connect($('code').value.trim()); });
+setInterval(renderPanel, 3000);
+var qk = /[?&]k=(\d{4})/.exec(location.search); $('code').value = qk ? qk[1] : (store.code || '');
+renderMenu(); renderNet(); renderPanel(); renderFeed(); show('menu');
+</script>
+</body>
+</html>

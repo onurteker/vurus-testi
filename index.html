@@ -71,7 +71,7 @@ nav button.on{color:var(--hit);font-weight:700;background:var(--panel)}
 </head>
 <body>
 <main>
-  <header><h1>Vuruş</h1><span id="ver">v0.4</span><span id="badge"></span></header>
+  <header><h1>Vuruş</h1><span id="ver">v0.5</span><span id="badge"></span></header>
   <button id="start">BAŞLAT</button>
   <div id="msg"></div>
 
@@ -113,11 +113,15 @@ nav button.on{color:var(--hit);font-weight:700;background:var(--panel)}
     <div class="card" id="calStatus"></div>
     <button id="calStart" class="wide primary">Öğretmeye başla</button>
     <div class="note" id="calResult"></div>
+    <h2>Örnek ekle</h2>
+    <p class="note">Eski örnekler silinmez. Bir yumruk karışıyorsa ya da telefonun yeri hafif değiştiyse o yumruktan 5 örnek daha ekle. Gard hareketi ses çıkarıyorsa "Gard örneği topla" ile sisteme neyin yumruk olmadığını öğret.</p>
+    <div class="g3" id="addRow"><button data-c="0">+5 Direkt</button><button data-c="1">+5 Kroşe</button><button data-c="2">+5 Aparkat</button></div>
+    <button id="negBtn" class="wide">Gard örneği topla (20 sn)</button>
     <button id="calClear" class="wide">Öğrenileni sil</button>
   </section>
 
   <section class="view" id="v-link">
-    <p class="note">İki telefonu aynı şarkıda birleştirir. Ana telefon şarkıyı, ritmi ve çağrıyı yönetir; her telefon kendi elinin sesini kendisi çalar. İki telefonun da internete bağlı olması yeterli, aynı Wi-Fi şart değil. Her telefonda önce el seçilmeli ve yumruklar öğretilmeli.</p>
+    <p class="note">İki telefonu aynı şarkıda birleştirir. Ana telefon şarkıyı, ritmi ve çağrıyı yönetir; her telefon kendi elinin sesini kendisi çalar. İki telefonun da internete bağlı olması yeterli, aynı Wi-Fi şart değil. Her telefonda önce el seçilmeli ve yumruklar öğretilmeli. Oyun ekranı ve kontrol paneli için üçüncü bir cihazda (bilgisayar, tablet) <b id="scrUrl"></b> sayfasını açıp buradaki kodu gir.</p>
     <div class="g2"><button id="hostBtn">Ana telefon ol</button><button id="joinBtn">Koda bağlan</button></div>
     <div class="row sp" id="joinRow" hidden><input id="code" type="text" inputmode="numeric" maxlength="4" placeholder="kod"><button id="joinGo" class="primary">Bağlan</button></div>
     <div class="card" id="linkStatus"></div>
@@ -132,6 +136,9 @@ nav button.on{color:var(--hit);font-weight:700;background:var(--panel)}
     <h2>Hassasiyet</h2>
     <div class="row"><input id="th" type="range" min="8" max="60" step="1"><span class="val" id="thv"></span></div>
     <p class="note">Gard hareketi ses çıkarıyorsa sayıyı büyüt. Yumruk algılanmıyorsa küçült.</p>
+    <h2>Tanımama sınırı</h2>
+    <div class="row"><input id="rj" type="range" min="0" max="2" step="0.1"><span class="val" id="rjv"></span></div>
+    <p class="note">Öğretilen hiçbir yumruğa benzemeyen hareket yok sayılır. Gerçek yumrukların "tanınmadı" diyorsa büyüt, 0 kapatır.</p>
     <h2>Ölçümler</h2>
     <dl>
       <dt>Sensör örnek aralığı</dt><dd id="dInt">–</dd>
@@ -225,12 +232,13 @@ function classify(x, ex, k, skip) {
   return { c: +best, d: ds[0].d };
 }
 function loo(ex) {
-  var ok = 0, conf = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], i, r;
+  var ok = 0, n = 0, conf = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], i, r;
   for (i = 0; i < ex.length; i++) {
-    r = classify(ex[i].f, ex, 3, i);
-    if (r) { conf[ex[i].c][r.c]++; if (r.c === ex[i].c) ok++; }
+    if (ex[i].c > 2) continue;
+    r = classify(ex[i].f, ex, 3, i); n++;
+    if (r) { if (r.c < 3) conf[ex[i].c][r.c]++; if (r.c === ex[i].c) ok++; }
   }
-  return { acc: ex.length ? ok / ex.length : 0, conf: conf };
+  return { acc: n ? ok / n : 0, conf: conf };
 }
 // Kendi tipindeki diğer örneklere benzemeyen örnekleri atar (yanlış tetiklenmiş kayıtlar).
 function prune(ex) {
@@ -242,6 +250,7 @@ function prune(ex) {
     var md = med(m);
     cls.forEach(function (e, i) { if (m[i] > 2.2 * md && m[i] > 0.9) dropped++; else keep.push(e); });
   }
+  keep = keep.concat(ex.filter(function (e) { return e.c > 2; }));
   return { ex: keep, dropped: dropped };
 }
 // Yumruk numarası (1-6) -> el ve tip. 1 sol direkt, 2 sağ direkt, 3 sol kroşe ...
@@ -279,7 +288,7 @@ var SONGS = [{
   ]
 }];
 var CAL_N = 8, T_N = 10, KEY = 'vurus_v2';
-var S = { ex: [], hand: 'R', pack: 'davul', th: 20, bpm: 100, prog: 0, call: true, best: {} };
+var S = { ex: [], hand: 'R', pack: 'davul', th: 20, rej: 1, bpm: 100, prog: 0, call: true, best: {} };
 try { var saved = JSON.parse(localStorage.getItem(KEY) || 'null'); if (saved) for (var k in saved) S[k] = saved[k]; } catch (e) {}
 if (!S.best) S.best = {};
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
@@ -289,6 +298,7 @@ var det = makeDetector(cfg);
 var ctx = null, noise = null, running = false, count = 0, tc = [0, 0, 0], hits = [];
 var buf = [], deltas = [], lastT = 0, src = '–', grav = [0, 0, 0], gyro = null;
 var cal = null, les = null, song = null, tst = null, songSeq = 0;
+var VER = 'v0.5', lab = null, neg = null, game = null, hidSeq = 0, recent = [], rejN = 0, lastK = [], stTick = 0;
 var beat = { on: false, next: 0, step: 0, t0: 0 };
 var link = newLink();
 
@@ -373,73 +383,129 @@ function nextBeat() {
 }
 
 /* ---------- vuruş ---------- */
+// Bir vuruşun öğretilenlerden hangisine, ne kadar benzediği. Hiçbirine benzemiyorsa "tanınmadı".
+function look(f) {
+  if (!S.ex.length) return { c: 0, d: 0, dc: [], known: true };
+  var r = classify(f, S.ex, 3), dc = [9, 9, 9, 9], i, d;
+  for (i = 0; i < S.ex.length; i++) { d = dist(f, S.ex[i].f); if (d < dc[S.ex[i].c]) dc[S.ex[i].c] = d; }
+  return { c: r.c, d: r.d, dc: dc.map(r2), known: r.c < 3 && !(S.rej > 0 && r.d > S.rej) };
+}
 function onHit(strength, t, tStart) {
   var f = features(buf, tStart, t); if (!f) return;
   if (cal) { calHit(f, t); return; }
-  var type = 0;
-  if (S.ex.length) { var r = classify(f, S.ex, 3); if (r) type = r.c; }
-  if (tst) { testHit(type, f, t); return; }
+  var r = look(f), hid = ++hidSeq;
+  recent.push({ id: hid, f: f.map(r3) }); if (recent.length > 60) recent.shift();
+  if (lab) { labHit(r, f, t, strength, hid); return; }
+  if (neg) { negHit(r, f, t, strength, hid); return; }
+  if (tst) { testHit(r, f, t); return; }
   try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
-  handleHit(S.hand, type, strength);
+  handleHit(r, f, strength, t, hid);
 }
 // Bu telefonun kendi yumrukları. Ses her zaman bu telefondan, gecikmesiz çıkar.
-function handleHit(hand, type, strength) {
-  count++; if (hand === S.hand) { tc[type]++; hits.push(Math.round(strength)); if (hits.length > 200) hits.shift(); }
-  var vol = Math.max(0.3, Math.min(1, (strength - cfg.threshold) / 50 + 0.3)), good = null, busy = !!(song || les);
-  if (song) good = songHit(type, vol);
+function handleHit(r, f, strength, t, hid) {
+  var hand = S.hand, type = r.c, g = null, good = null, busy = !!(song || les || game);
+  var vol = Math.max(0.3, Math.min(1, (strength - cfg.threshold) / 50 + 0.3));
+  count++; lastK.push(r.known ? 1 : 0); if (lastK.length > 10) lastK.shift();
+  if (game) { g = gameHit(r, vol, t); good = g ? !!g.ok : null; }
+  else if (!r.known) { rejN++; play('tick', 0.25); mountCheck(); }
   else {
-    play(PACKS[S.pack][hand][type], vol);
-    if (link.ok) tx({ k: 'hit', ty: type, s: Math.round(strength), h: hand });
-    if (les) { good = lessonHit(type, inRhythm()); if (good === false) play('buzz', 0.5); }
+    tc[type]++; hits.push(Math.round(strength)); if (hits.length > 200) hits.shift();
+    if (song) good = songHit(type, vol);
+    else {
+      play(PACKS[S.pack][hand][type], vol);
+      if (link.ok) tx({ k: 'hit', ty: type, s: Math.round(strength), h: hand });
+      if (les) { good = lessonHit(type, inRhythm()); if (good === false) play('buzz', 0.5); }
+    }
   }
-  showHit(hand, type, strength, good, busy);
-}
-function showHit(hand, type, strength, good, busy) {
-  var known = S.ex.length || hand !== S.hand;
-  var name = known ? ((link.ok ? handName(hand) + ' ' : '') + TYPES[type].toLowerCase()) : 'vuruş';
+  sendX(r, strength, t, hid, f, g);
+  var name = !S.ex.length ? 'vuruş' : (game && !g) ? 'boş' : (!game && !r.known) ? 'tanınmadı' : ((link.ok ? handName(hand) + ' ' : '') + TYPES[Math.min(type, 2)].toLowerCase());
   $('big').textContent = name; $('count').textContent = count;
   $('sub').textContent = 'şiddet ' + Math.round(strength) + ' m/s²';
   if (!busy) { $('lockBig').textContent = name; $('lockSub').textContent = count + ' vuruş'; }
   flash($('pad'), good === false); flash($('lock'), good === false);
 }
+function mountCheck() {
+  var bad = lastK.filter(function (v) { return !v; }).length;
+  if (lastK.length >= 8 && bad >= 5) say('Yumrukların çoğu tanınmıyor. Telefonun bilekteki yeri değişmiş olabilir: Öğret sekmesinden yeniden öğret ya da örnek ekle.');
+}
 function flash(el, bad) {
   el.classList.add('flash'); if (bad) el.classList.add('bad');
   setTimeout(function () { el.classList.remove('flash'); el.classList.remove('bad'); }, 110);
 }
-function stopModes() { if (song) endSong(false); if (les) endLesson(false); }
+function stopModes() { if (song) endSong(false); if (les) endLesson(false); if (game) gameStop(); }
 
 /* ---------- öğretme ---------- */
-function calBegin() {
+// only: yalnızca bu tip (yoksa üçü birden). keep: eski örnekler kalsın.
+function calBegin(only, n, keep) {
   if (!running) { say('Önce BAŞLAT\'a bas.'); return; }
-  stopModes(); tst = null; S.ex = []; S.acc = null; S.drop = 0;
-  cal = { c: 0, n: 0, wait: performance.now() + 3500 };
-  speak('Direkt. Sekiz kez at.'); play('bell:660', 0.5); renderCal();
+  stopModes(); tst = null; lab = null; neg = null;
+  if (!keep) { S.ex = []; S.acc = null; S.drop = 0; }
+  cal = { c: only == null ? 0 : only, n: 0, N: n || CAL_N, only: only == null ? null : only, wait: performance.now() + 3500 };
+  speak(TYPES[cal.c] + '. ' + cal.N + ' kez at.'); play('bell:660', 0.5); renderCal();
 }
 function calHit(f, t) {
   if (t < cal.wait) return;
   S.ex.push({ c: cal.c, f: f.map(r3) }); cal.n++; play('tick', 0.6);
-  if (cal.n >= CAL_N) {
-    cal.c++; cal.n = 0;
-    if (cal.c >= TYPES.length) {
-      cal = null; var p = prune(S.ex); S.ex = p.ex; S.drop = p.dropped;
-      var r = loo(S.ex); S.acc = r.acc; S.conf = r.conf; save();
-      speak('Bitti.'); play('bell:880', 0.6); if (link.ok) hello(true);
-    } else { cal.wait = t + 3500; speak(TYPES[cal.c] + '. Sekiz kez at.'); play('bell:660', 0.5); }
+  if (cal.n >= cal.N) {
+    if (cal.only == null && cal.c + 1 < TYPES.length) { cal.c++; cal.n = 0; cal.wait = t + 3500; speak(TYPES[cal.c] + '. ' + cal.N + ' kez at.'); play('bell:660', 0.5); }
+    else {
+      var full = cal.only == null; cal = null;
+      if (full) { var p = prune(S.ex); S.ex = p.ex; S.drop = p.dropped; }
+      relearn(); speak('Bitti.'); play('bell:880', 0.6);
+    }
   }
   renderCal();
 }
+function relearn() {
+  var r = loo(S.ex); S.acc = r.acc; S.conf = r.conf; save(); renderCal();
+  if (link.ok) hello(true);
+  sendStatus();
+}
+// Etiketli seri: hangi yumruğun atıldığı bilinir; yanlış tanınanlar istenirse örnek olarak eklenir.
+function labBegin(c, n, learn) {
+  stopModes(); cal = null; tst = null; neg = null;
+  lab = { c: c, n: n, got: 0, learn: learn, add: 0, wait: performance.now() + 3000 };
+  speak(TYPES[c] + '. ' + n + ' kez at.'); play('bell:660', 0.5);
+  $('lockBig').textContent = TYPES[c]; $('lockSub').textContent = '0 / ' + n;
+}
+function labHit(r, f, t, strength, hid) {
+  if (t < lab.wait) return;
+  var good = r.known && r.c === lab.c; lab.got++;
+  if (!good && lab.learn) { S.ex.push({ c: lab.c, f: f.map(r3) }); lab.add++; }
+  play(good ? 'tick' : 'buzz', 0.6); sendX(r, strength, t, hid, f, null, lab.c);
+  $('lockSub').textContent = lab.got + ' / ' + lab.n;
+  if (lab.got >= lab.n) { lab = null; relearn(); speak('Bitti.'); play('bell:880', 0.6); }
+}
+// Gard örnekleri: yumruk atılmadan yapılan hareketlerden ses çıkaranlar "yumruk değil" olarak öğrenilir.
+function negBegin(secs) {
+  if (!running) { say('Önce BAŞLAT\'a bas.'); return; }
+  stopModes(); cal = null; tst = null; lab = null;
+  var me = neg = { add: 0, wait: performance.now() + 3000 };
+  speak('Gard. ' + secs + ' saniye yumruk atmadan hareket et.'); play('bell:660', 0.5);
+  $('lockBig').textContent = 'Gard'; $('lockSub').textContent = 'yumruk atma';
+  setTimeout(function () {
+    if (neg !== me) return;
+    neg = null; relearn(); speak('Bitti.'); play('bell:880', 0.6);
+    say(me.add ? me.add + ' gard hareketi öğrenildi.' : 'Gardda yanlış ses çıkmadı, eklenecek örnek yok.', true);
+  }, 3000 + secs * 1000);
+}
+function negHit(r, f, t, strength, hid) {
+  if (t < neg.wait) return;
+  if (r.known && neg.add < 12) { S.ex.push({ c: 3, f: f.map(r3) }); neg.add++; play('buzz', 0.4); }
+  sendX(r, strength, t, hid, f, null, 3);
+}
 function renderCal() {
-  var n = [0, 0, 0]; S.ex.forEach(function (e) { n[e.c]++; });
+  var n = [0, 0, 0, 0]; S.ex.forEach(function (e) { n[e.c]++; });
   $('calStatus').innerHTML = TYPES.map(function (name, i) {
     var cur = cal && cal.c === i;
     return '<div class="row" style="justify-content:space-between;padding:4px 0' + (cur ? ';color:var(--hit);font-weight:700' : '') + '"><span>' +
       name + (cur ? ' ← şimdi bunu at' : '') + '</span><span>' + n[i] + ' örnek</span></div>';
-  }).join('');
+  }).join('') + (n[3] ? '<div class="row" style="justify-content:space-between;padding:4px 0;color:var(--dim)"><span>Gard (yumruk değil)</span><span>' + n[3] + ' örnek</span></div>' : '');
   $('calStart').textContent = cal ? 'Öğretiliyor…' : (S.ex.length ? 'Yeniden öğret' : 'Öğretmeye başla');
   $('calStart').disabled = !!cal;
   var txt = '';
   if (!cal && S.ex.length && S.acc != null) {
-    txt = 'Ayırt etme başarısı: %' + Math.round(S.acc * 100) + ' (' + S.ex.length + ' örnek, kendi kendini sınama).';
+    txt = 'Ayırt etme başarısı: %' + Math.round(S.acc * 100) + ' (' + (n[0] + n[1] + n[2]) + ' örnek, kendi kendini sınama).';
     if (S.drop) txt += ' ' + S.drop + ' aykırı örnek atıldı.';
     var worst = 0, pair = null;
     if (S.conf) S.conf.forEach(function (row, i) { row.forEach(function (v, j) { if (i !== j && v > worst) { worst = v; pair = [i, j]; } }); });
@@ -447,7 +513,7 @@ function renderCal() {
     txt += ' Gerçek başarı için Veri sekmesindeki doğrulama testini yap.';
   }
   $('calResult').textContent = txt;
-  if (cal) { $('lockBig').textContent = TYPES[cal.c]; $('lockSub').textContent = cal.n + ' / ' + CAL_N; }
+  if (cal) { $('lockBig').textContent = TYPES[cal.c]; $('lockSub').textContent = cal.n + ' / ' + cal.N; }
   $('hint').textContent = S.ex.length ? '' : 'Şu an her yumruk aynı sesi çalar. Üç ayrı ses için Öğret sekmesinden yumruklarını öğret.';
 }
 
@@ -456,12 +522,15 @@ function testBegin() {
   if (!running) { say('Önce BAŞLAT\'a bas.'); return; }
   if (!S.ex.length) { say('Test için önce Öğret sekmesinden yumruklarını öğret.'); return; }
   say(''); stopModes(); cal = null;
-  tst = { st: 0, n: 0, wait: performance.now() + 3500, conf: [[0, 0, 0], [0, 0, 0], [0, 0, 0]], fa: 0, miss: [] };
+  lab = null; neg = null;
+  tst = { st: 0, n: 0, wait: performance.now() + 3500, conf: [[0, 0, 0], [0, 0, 0], [0, 0, 0]], fa: 0, far: 0, rej: [0, 0, 0], miss: [] };
   speak(TYPES[0] + '. On kez at.'); play('bell:660', 0.5); renderTest();
 }
-function testHit(type, f, t) {
+function testHit(r, f, t) {
   if (t < tst.wait) return;
-  if (tst.st >= 3) { tst.fa++; play('buzz', 0.4); renderTest(); return; }
+  if (tst.st >= 3) { if (r.known) { tst.fa++; play('buzz', 0.4); } else tst.far++; renderTest(); return; }
+  if (!r.known) { tst.rej[tst.st]++; play('tom', 0.4); if (tst.miss.length < 12) tst.miss.push([tst.st, -1].concat(f.map(r2))); renderTest(); return; }
+  var type = r.c;
   tst.conf[tst.st][type]++; tst.n++; play('tick', 0.6);
   if (type !== tst.st && tst.miss.length < 12) tst.miss.push([tst.st, type].concat(f.map(r2)));
   if (tst.n >= T_N) {
@@ -475,8 +544,8 @@ function testHit(type, f, t) {
   renderTest();
 }
 function testEnd() {
-  S.test = { conf: tst.conf, fa: tst.fa, miss: tst.miss, th: S.th, n: S.ex.length };
-  tst = null; save(); speak('Test bitti.'); play('bell:880', 0.6); renderTest();
+  S.test = { conf: tst.conf, fa: tst.fa, far: tst.far, rej: tst.rej, miss: tst.miss, th: S.th, n: S.ex.length };
+  tst = null; save(); speak('Test bitti.'); play('bell:880', 0.6); renderTest(); sendStatus();
 }
 function renderTest() {
   var t = tst || S.test, html = '';
@@ -486,7 +555,7 @@ function renderTest() {
     html = TYPES.map(function (name, i) {
       var row = t.conf[i], tot = row[0] + row[1] + row[2];
       return '<div class="row" style="justify-content:space-between;padding:3px 0"><span>' + name +
-        (tst && tst.st === i ? ' ← şimdi' : '') + '</span><span>' + row[i] + ' / ' + tot + ' doğru</span></div>';
+        (tst && tst.st === i ? ' ← şimdi' : '') + '</span><span>' + row[i] + ' / ' + tot + ' doğru' + (t.rej && t.rej[i] ? ', ' + t.rej[i] + ' tanınmadı' : '') + '</span></div>';
     }).join('') + '<div class="row" style="justify-content:space-between;padding:3px 0"><span>Gardda yanlış ses' +
       (tst && tst.st === 3 ? ' ← şimdi, yumruk atma' : '') + '</span><span>' + t.fa + '</span></div>';
   }
@@ -663,7 +732,7 @@ function endLesson(finished) {
 // Mesajlar herkese açık aktarma sunucularından geçer; iki telefonun aynı ağda olması gerekmez.
 // Gecikme sesi etkilemesin diye her telefon kendi notasını kendisi çalar.
 var BROKERS = ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt'];
-function newLink() { return { role: null, code: null, mq: [], up: 0, ok: false, err: null, rtt: [], other: null, got: 0, last: 0, seen: {}, nseen: 0, seq: 0, me: Math.random().toString(36).slice(2, 8) }; }
+function newLink() { return { role: null, code: null, mq: [], up: 0, ok: false, err: null, rtt: [], other: null, got: 0, last: 0, scr: 0, seen: {}, nseen: 0, seq: 0, me: Math.random().toString(36).slice(2, 8) }; }
 function topic(to) { return 'vurus-m4rt3/' + link.code + '/' + to; }
 function tx(d) {
   d.m = link.me + '-' + (++link.seq);
@@ -676,7 +745,7 @@ function linkClose() {
   var wasOk = link.ok;
   link.mq.forEach(function (c) { try { c.end(true); } catch (e) {} });
   if (wasOk && song) { song.lead ? endSong(false) : (song = null); }
-  link = newLink(); renderLink(); renderSong();
+  link = newLink(); if (game) gameStop(); renderLink(); renderSong();
 }
 function linkStart(role, code) {
   linkClose();
@@ -702,6 +771,7 @@ function linkStart(role, code) {
   renderLink();
 }
 function onData(d) {
+  if (d.sc) { onScreen(d); return; }
   link.last = performance.now();
   if (!link.ok && d.k !== 'hello') { link.ok = true; renderLink(); renderSong(); }
   if (d.k === 'hello') {
@@ -724,7 +794,81 @@ setInterval(function () {
   if (link.role === 'join' && !link.ok && link.up) hello();
   if (link.role === 'host' && link.ok) tx({ k: 'ping', t: performance.now() });
   if (link.ok && performance.now() - link.last > 10000) linkDown();
+  if (scrOn()) { if (++stTick % 2 === 0) sendStatus(); } else if (link.scr) { link.scr = 0; if (game) gameStop(); renderLink(); }
 }, 2000);
+
+/* ---------- ekran: oyun ve kontrol paneli (üçüncü cihaz) ---------- */
+function scrOn() { return !!(link.role && link.scr && performance.now() - link.scr < 8000); }
+function txs(d) {
+  d.m = link.me + '-' + (++link.seq); d.f = link.me; d.h = S.hand;
+  var s = JSON.stringify(d), t = topic('s');
+  link.mq.forEach(function (c) { try { if (c.connected) c.publish(t, s, { qos: 1 }); } catch (e) {} });
+}
+function sendX(r, strength, t, hid, f, g, tr) {
+  if (!scrOn()) return;
+  var d = { k: 'x', hid: hid, ty: r.known ? r.c : -1, c: r.c, d: r2(r.d), dc: r.dc, s: Math.round(strength), w: Math.round(t), ft: f.map(r2) };
+  if (g) d.g = g;
+  if (tr != null) d.tr = tr;
+  txs(d);
+}
+function sendStatus() {
+  if (!scrOn()) return;
+  var n = [0, 0, 0, 0]; S.ex.forEach(function (e) { n[e.c]++; });
+  txs({ k: 'st', v: VER, run: running ? 1 : 0, n: n, acc: S.acc == null ? null : Math.round(S.acc * 100), th: S.th, rej: S.rej,
+    test: S.test ? { conf: S.test.conf, fa: S.test.fa, rej: S.test.rej || null } : null, int: med(deltas), cnt: count, rejN: rejN,
+    busy: cal ? 'öğretme ' + TYPES[cal.c] + ' ' + cal.n + '/' + cal.N : tst ? 'test' : lab ? 'seri' : neg ? 'gard' : game ? 'oyun' : song ? 'şarkı' : '' });
+}
+function onScreen(d) {
+  var was = scrOn(); link.scr = performance.now();
+  if (d.k === 'sp') { txs({ k: 'sq', t: d.t, w: performance.now() }); if (!was) { sendStatus(); renderLink(); } }
+  else if (d.k === 'gs') gameStart(d);
+  else if (d.k === 'ge') { if (game && game.id === d.id) gameStop(); }
+  else if (d.k === 'cmd' && (d.to === '*' || d.to === link.me)) doCmd(d);
+}
+function doCmd(d) {
+  var c = d.c, msg = '', needs = { teach: 1, test: 1, label: 1, neg: 1 };
+  if (needs[c] && !running) msg = 'telefonda BAŞLAT\'a basılmamış';
+  else if ((c === 'test' || c === 'label') && !S.ex.length) msg = 'önce yumruklar öğretilmeli';
+  else if (c === 'teach') calBegin(d.ty, d.n, d.keep);
+  else if (c === 'test') testBegin();
+  else if (c === 'label') labBegin(d.ty, d.n || 10, !!d.learn);
+  else if (c === 'neg') negBegin(d.secs || 20);
+  else if (c === 'th') { setTh(Math.max(8, Math.min(60, d.v))); save(); }
+  else if (c === 'rej') { setRej(Math.max(0, Math.min(2, d.v))); save(); }
+  else if (c === 'prune') { var p = prune(S.ex); S.ex = p.ex; S.drop = (S.drop || 0) + p.dropped; relearn(); msg = p.dropped + ' aykırı örnek atıldı'; }
+  else if (c === 'clrneg') { S.ex = S.ex.filter(function (e) { return e.c < 3; }); relearn(); }
+  else if (c === 'fix') {
+    var h = recent.filter(function (x) { return x.id === d.hid; })[0];
+    if (h) { S.ex.push({ c: d.ty, f: h.f }); relearn(); msg = 'örnek eklendi'; } else msg = 'vuruş artık bellekte değil';
+  }
+  else if (c === 'stop') { stopModes(); cal = null; tst = null; lab = null; neg = null; renderCal(); renderTest(); }
+  else if (c === 'rep') txs({ k: 'rep', txt: reportText() });
+  txs({ k: 'ack', c: c, msg: msg }); sendStatus();
+}
+// Oyun: notaları ve başlangıç anını ekran verir; zamanlamayı ve sesi bu telefon kendi saatinde, yerinde çözer.
+function gameStart(d) {
+  var mine = d.n && d.n[link.me], t0 = d.t0 && d.t0[link.me];
+  if (!mine || t0 == null) return;
+  stopModes(); cal = null; tst = null; lab = null; neg = null;
+  var me = game = { id: d.id, t0: t0, len: d.len, notes: mine.map(function (a) { return { i: a[0], t: a[1], ty: a[2], fq: a[3], done: false }; }) };
+  say(running ? 'Oyun başladı.' : 'Oyun başladı ama bu telefonda BAŞLAT\'a basılmamış.', running);
+  $('big').textContent = 'oyun'; $('lockBig').textContent = 'Oyun'; $('lockSub').textContent = 'ekrana bak';
+  setTimeout(function () { if (game === me) gameStop(); }, Math.max(1000, t0 + d.len + 3000 - performance.now()));
+}
+function gameStop() { game = null; $('lockBig').textContent = '–'; $('lockSub').textContent = ''; sendStatus(); }
+function gameHit(r, vol, t) {
+  var best = null, bd = 0, i, n, dt;
+  for (i = 0; i < game.notes.length; i++) {
+    n = game.notes[i]; if (n.done) continue;
+    dt = t - (game.t0 + n.t);
+    if (Math.abs(dt) <= 260 && (!best || Math.abs(dt) < Math.abs(bd))) { best = n; bd = dt; }
+  }
+  if (!best || r.c > 2) { play('tick', 0.2); return null; }
+  best.done = true;
+  var ok = r.c === best.ty;
+  if (ok) play('pluck:' + best.fq, Math.max(0.6, vol)); else play('buzz', 0.5);
+  return { i: best.i, dt: Math.round(bd), ok: ok ? 1 : 0 };
+}
 function renderLink() {
   var h = '';
   if (!link.role) h = 'Bağlı değil. Bu telefon tek başına çalışıyor.';
@@ -735,6 +879,7 @@ function renderLink() {
     if (!link.up) h += 'Sunucuya bağlanılıyor…';
     else if (!link.ok) h += link.role === 'host' ? 'Hazır. İkinci telefonda "Koda bağlan"a basıp bu kodu gir.' : 'Ana telefon aranıyor… Kodun doğru olduğundan ve ana telefonda bu sayfanın açık olduğundan emin ol.';
     else h += 'Bağlandı. Her telefon kendi elinin sesini çalar.';
+    h += scrOn() ? '<br><span style="color:var(--ok)">Ekran bağlı: oyun ve kontrol paneli hazır.</span>' : '';
   }
   if (link.ok && link.other) {
     h += '<br>Karşı telefon: ' + handName(link.other.h) + ' el, ' + link.other.n + ' öğretilmiş örnek.';
@@ -743,8 +888,8 @@ function renderLink() {
   }
   if (link.err) h += '<br><span style="color:var(--bad)">Hata: ' + link.err + '</span>';
   $('linkStatus').innerHTML = h;
-  $('badge').textContent = link.ok ? (link.role === 'host' ? 'ana · bağlı' : 'ikinci · bağlı') : '';
-  $('badge').className = link.ok ? 'on' : '';
+  $('badge').textContent = (link.ok ? (link.role === 'host' ? 'ana · bağlı' : 'ikinci · bağlı') : '') + (scrOn() ? (link.ok ? ' · ' : '') + 'ekran' : '');
+  $('badge').className = link.ok || scrOn() ? 'on' : '';
 }
 
 /* ---------- sensör ---------- */
@@ -828,7 +973,12 @@ $('beatBtn').addEventListener('click', function () {
   if (!ctx) { say('Önce BAŞLAT\'a bas.'); return; }
   if (!song) setBeat(!beat.on);
 });
-$('calStart').addEventListener('click', calBegin);
+$('calStart').addEventListener('click', function () { calBegin(); });
+each($('addRow').children, function (b) { b.addEventListener('click', function () { calBegin(+b.getAttribute('data-c'), 5, true); }); });
+$('negBtn').addEventListener('click', function () { negBegin(20); });
+function setRej(v) { S.rej = v; $('rj').value = v; $('rjv').textContent = v > 0 ? v.toFixed(1) : 'kapalı'; }
+$('rj').addEventListener('input', function () { setRej(+this.value); save(); });
+$('scrUrl').textContent = location.host + location.pathname.replace(/[^\/]*$/, '') + 'ekran.html';
 $('calClear').addEventListener('click', function () { cal = null; S.ex = []; S.acc = null; S.conf = null; S.test = null; save(); renderCal(); renderTest(); });
 $('lStop').addEventListener('click', function () { endLesson(false); });
 $('sStop').addEventListener('click', function () { endSong(false); });
@@ -838,22 +988,25 @@ $('hostBtn').addEventListener('click', function () { $('joinRow').hidden = true;
 $('joinBtn').addEventListener('click', function () { $('joinRow').hidden = false; $('code').focus(); });
 $('joinGo').addEventListener('click', function () { linkStart('join', $('code').value.trim()); });
 $('linkOff').addEventListener('click', linkClose);
-$('copy').addEventListener('click', function () {
+function reportText() {
   var s = stats(), f = function (v) { return v === null ? '?' : v.toFixed(1); }, J = JSON.stringify, T = S.test;
-  var txt = 'Vuruş v0.4 raporu\n' +
+  var n = [0, 0, 0, 0]; S.ex.forEach(function (e) { n[e.c]++; });
+  return 'Vuruş v0.5 raporu\n' +
     'cihaz: ' + navigator.userAgent.replace(/^.*?\((.*?)\).*$/, '$1') + '\n' +
-    'el: ' + S.hand + ' | paket: ' + S.pack + ' | eşik: ' + S.th + '\n' +
+    'el: ' + S.hand + ' | paket: ' + S.pack + ' | eşik: ' + S.th + ' | tanımama sınırı: ' + S.rej + '\n' +
     'sensör aralığı: ' + f(s.int) + ' ms | ses çıkışı: ' + f(s.out) + ' ms | jiroskop: ' + (gyro ? 'var' : 'yok') + ' | kaynak: ' + src + '\n' +
-    'bağlantı: ' + (link.role || 'yok') + (link.ok ? ' bağlı' : '') + ' | sunucu: ' + link.up + '/' + BROKERS.length + ' | gidiş-dönüş: ' + f(s.rtt) + ' ms | gelen yumruk: ' + link.got +
+    'bağlantı: ' + (link.role || 'yok') + (link.ok ? ' bağlı' : '') + ' | sunucu: ' + link.up + '/' + BROKERS.length + ' | ekran: ' + (scrOn() ? 'bağlı' : 'yok') + ' | gidiş-dönüş: ' + f(s.rtt) + ' ms | gelen yumruk: ' + link.got +
     (link.other ? ' | karşı el: ' + link.other.h : '') + (link.err ? ' | hata: ' + link.err : '') + '\n' +
-    'öğretme: ' + S.ex.length + ' örnek | ayırt etme: ' + (S.acc == null ? '-' : Math.round(S.acc * 100) + '%') +
+    'öğretme: ' + n.join('/') + ' örnek (direkt/kroşe/aparkat/gard) | ayırt etme: ' + (S.acc == null ? '-' : Math.round(S.acc * 100) + '%') +
     ' | karışıklık: ' + J(S.conf || []) + ' | atılan aykırı: ' + (S.drop || 0) + '\n' +
-    'doğrulama testi: ' + (T ? J(T.conf) + ' | gardda yanlış ses: ' + T.fa + ' | eşik: ' + T.th : 'yapılmadı') + '\n' +
-    'oturum: ' + count + ' vuruş, tiplere göre ' + tc.join('/') + ' | ders: ' + S.prog + ' | şarkı en iyi: ' + J(S.best) + '\n' +
+    'doğrulama testi: ' + (T ? J(T.conf) + ' | tanınmadı: ' + J(T.rej || []) + ' | gardda yanlış ses: ' + T.fa + ' (yok sayılan ' + (T.far || 0) + ') | eşik: ' + T.th : 'yapılmadı') + '\n' +
+    'oturum: ' + count + ' vuruş, tiplere göre ' + tc.join('/') + ', tanınmadı ' + rejN + ' | ders: ' + S.prog + ' | şarkı en iyi: ' + J(S.best) + '\n' +
     'son şiddetler: ' + hits.slice(-20).join(',') + '\n' +
     'testte yanlışlar [beklenen,bulunan,özellikler]: ' + J(T ? T.miss : []) + '\n' +
     'örnekler: ' + J(S.ex.map(function (e) { return [e.c].concat(e.f.map(r2)); }));
-  var ta = $('out'); ta.value = txt; ta.style.display = 'block';
+}
+$('copy').addEventListener('click', function () {
+  var txt = reportText(), ta = $('out'); ta.value = txt; ta.style.display = 'block';
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(txt).then(function () { say('Kopyalandı. Sohbete yapıştırabilirsin.', true); })
       .catch(function () { say('Otomatik kopyalanamadı. Aşağıdaki metni elle kopyala.'); });
@@ -867,7 +1020,12 @@ $('lock').addEventListener('touchstart', holdStart, { passive: false });
 $('lock').addEventListener('touchend', holdEnd); $('lock').addEventListener('touchcancel', holdEnd);
 $('lock').addEventListener('mousedown', holdStart); $('lock').addEventListener('mouseup', holdEnd);
 
-setTh(S.th); setBpm(S.bpm); renderChoices(); renderCal(); renderTest(); renderSong(); renderLessons(); renderLink();
+// Eski sürümden kalan örneklerdeki aykırılar bir kez temizlenir.
+if (!S.v5) {
+  if (S.ex.length) { var p0 = prune(S.ex); S.ex = p0.ex; S.drop = (S.drop || 0) + p0.dropped; var l0 = loo(S.ex); S.acc = l0.acc; S.conf = l0.conf; }
+  S.v5 = 1; save();
+}
+setTh(S.th); setRej(S.rej); setBpm(S.bpm); renderChoices(); renderCal(); renderTest(); renderSong(); renderLessons(); renderLink();
 </script>
 </body>
 </html>
