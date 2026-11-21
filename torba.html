@@ -46,7 +46,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 </head>
 <body>
 <div class="scr on" id="home">
-  <h1>Vuruş</h1><small class="v">Torba · v1.2.4</small>
+  <h1>Vuruş</h1><small class="v">Torba · v1.2.5</small>
   <p style="margin-top:16px"><b>Torbaya vur, şarkıyı sen çal.</b> Her vuruş melodinin bir notası; ne kadar sert vurursan o kadar güçlü çalar.</p>
   <div class="box"><b>Kurulum</b><p>1. Telefonu torbanın <b>en üst kısmına</b>, vuruş bölgesinin dışına, ekranı sana bakacak şekilde <b>sıkıca</b> bağla. Torbanın en az sallanan yeri üstüdür. Gevşek kayış yanlış sayar.<br>2. Sesi sonuna kadar aç, sessiz modu kapat.<br>3. BAŞLA'ya bas, sensör iznini ver.</p></div>
   <button id="start" class="big primary">BAŞLA</button>
@@ -120,7 +120,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 <script>
 'use strict';
 var $ = function (id) { return document.getElementById(id); };
-var VER = 'torba-1.2.4', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
+var VER = 'torba-1.2.5', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
 function pn(n) { return { h: n % 2 ? 'L' : 'R', ty: Math.floor((n - 1) / 2) }; }
 function med(a) { if (!a.length) return 0; var s = a.slice().sort(function (p, q) { return p - q; }); return s[Math.floor(s.length / 2)]; }
 function r1(v) { return Math.round(v * 10) / 10; }
@@ -274,6 +274,7 @@ function play(def, vol, when, dest) {
   else if (k === 'tick') tone('sine', 1320, 0, 0.07, 0.5, t, out);
   else if (k === 'chord') { tone('triangle', f, 0, 0.55, 0.5, t, out); tone('triangle', f * 1.5, 0, 0.5, 0.32, t, out); tone('sine', f * 2, 0, 0.45, 0.28, t, out); }
   else if (k === 'crash') nz(5000, 0.9, 0.6, t, out);
+  else if (k === 'lead') { tone('sawtooth', f, 0, 0.22, 0.5, t, out); tone('square', f * 2, 0, 0.14, 0.15, t, out); tone('triangle', f, 0, 0.28, 0.5, t, out); }
 }
 
 
@@ -401,7 +402,8 @@ function size() { var r = window.devicePixelRatio || 1; cv.width = Math.round(cv
 window.addEventListener('resize', size);
 function renderMenu() {
   dayRoll();
-  $('songs').innerHTML = SONGS.map(function (s, i) { var b = S.best[i + '-' + S.lvl]; return '<button data-i="' + i + '" class="' + (i === S.i ? 'sel' : '') + '" style="font-size:15px">' + s.n + (b ? '<br><small class="v">en iyi ' + b + '</small>' : '') + '</button>'; }).join('');
+  var SL = SONGS.map(function (s, i) { var b = S.best[i + '-' + S.lvl]; return '<button data-i="' + i + '" class="' + (i === S.i ? 'sel' : '') + '" style="font-size:15px">' + s.n + (b ? '<br><small class="v">en iyi ' + b + '</small>' : i >= KFIRST ? '<br><small class="v">kombo · koç söyler</small>' : '') + '</button>'; });
+  $('songs').innerHTML = SL.slice(KFIRST).concat(SL.slice(0, KFIRST)).join('');
   $('lvls').innerHTML = LV.map(function (n, i) { return '<button data-i="' + i + '" class="' + (i === S.lvl ? 'sel' : '') + '">' + n + '</button>'; }).join('');
   $('thV').textContent = S.thr.toFixed(1); $('pwV').textContent = S.pw.toFixed(1); $('gd').textContent = S.guide ? 'Açık' : 'Kapalı';
   var iv = deltas.length > 30 ? med(deltas) : 0; $('warn').textContent = iv > 30 ? 'Sensör yavaş çalışıyor (' + Math.round(iv) + ' ms). Düşük güç modunu kapat; zamanlama bozulabilir.' : '';
@@ -424,16 +426,17 @@ $('pwM').addEventListener('click', function () { adjPw(-1); }); $('pwP').addEven
 function startGame() {
   initAudio();
   var ch = SONGS[S.i].build(S.lvl), need = S.lvl === 0 ? 5 : 3, ev = [], k;
-  var notes = ch.notes.map(function (n, i) { return { i: i, t: n.t, fq: n.fq, pow: n.p >= need, st: null, weak: false, dt: 0, h: null }; });
+  var notes = ch.notes.map(function (n, i) { return { i: i, t: n.t, fq: n.fq, num: n.num || 0, pow: n.p >= need, st: null, weak: false, dt: 0, h: null }; });
   var t0 = performance.now() + 1200 + 4 * ch.beat, a0 = ac.currentTime + (t0 - performance.now()) / 1000;
   // Sesler baştan topluca değil, çalınmadan 1,6 sn önce kurulur: zayıf telefonda takılma olmaz.
   for (k = 4; k >= 1; k--) ev.push([-k * ch.beat / 1000, 'tick', 0.6]);
   ch.grid.forEach(function (g) { ev.push([g[0] / 1000, ['kick', 'snare', 'hat'][g[1]], [0.5, 0.25, 0.1][g[1]]]); });
   (ch.bass || []).forEach(function (g) { ev.push([g[0] / 1000, 'bass:' + g[1], 0.4]); });
+  (ch.bgx || []).forEach(function (g) { ev.push([g[0] / 1000, g[1], g[2]]); });
   // Ekrana bakmadan çalmak için: kısık zil notanın yerini, yükselen ses sert vuruşu haber verir.
   if (S.guide) notes.forEach(function (n) { ev.push([n.t / 1000, 'bell:' + n.fq * 2, 0.1]); if (n.pow) ev.push([n.t / 1000 - ch.beat * 0.0009, 'rise', ch.beat * 0.0009]); });
   ev.sort(function (p, q) { return p[0] - q[0]; });
-  game = { i: S.i, lvl: S.lvl, notes: notes, t0: t0, a0: a0, ev: ev, ei: 0, len: ch.len, beat: ch.beat, fx: [], pop: null, dts: [], hl: [], stray: 0, score: 0, combo: 0, maxCombo: 0, mult: 1, cnt: {}, done: false };
+  game = { i: S.i, lvl: S.lvl, notes: notes, t0: t0, a0: a0, ev: ev, ei: 0, len: ch.len, beat: ch.beat, fx: [], pop: null, dts: [], hl: [], stray: 0, score: 0, combo: 0, maxCombo: 0, mult: 1, cnt: {}, done: false, calls: ch.calls || null, ci: 0, call: null, cheer: 0 };
   stopAudio(); bg = ac.createGain(); bg.gain.value = 0.8; bg.connect(mst); lastStart = startGame;
   $('hSong').textContent = SONGS[S.i].n + ' · ' + LV[S.lvl]; mode = 'game'; recalc(); show('stage');
   cancelAnimationFrame(raf); raf = requestAnimationFrame(frame); tick(); recStart();
@@ -451,7 +454,7 @@ function gameHit(h) {
   if (!best) { g.stray++; fx('tom', vol(h.s0) * 0.7); h.up = function () { if (game === g) meter.s = h.s; }; recalc(); return; }
   g.dts.push(bd); var a = g.dts.length >= 6 ? bd - med(g.dts) : bd;
   best.h = h; best.dt = Math.round(a); best.st = Math.abs(a) <= PERF ? 'perfect' : 'good'; best.weak = best.pow && h.s0 < S.pwi;
-  play('pluck:' + best.fq, vol(h.s0)); if (best.pow && !best.weak) fx('boom', 0.8);
+  noteSnd(best.fq, vol(h.s0)); if (best.pow && !best.weak) fx('boom', 0.8);
   g.fx.push({ st: best.st, at: now, pow: best.pow && !best.weak });
   g.pop = { k: best.weak ? 'weak' : best.pow ? 'pow' : best.st, at: now };
   h.up = function () {
@@ -460,7 +463,7 @@ function gameHit(h) {
     if (best.weak && h.s >= S.pw) { best.weak = false; fx('boom', 0.8); g.pop = { k: 'pow', at: performance.now() }; g.fx.push({ st: best.st, at: performance.now(), pow: true }); }
     recalc();
   };
-  recalc();
+  recalc(); comboCheer(g);
 }
 function recalc() {
   var combo = 0, score = 0, mx = 0, c = { perfect: 0, good: 0, miss: 0, weak: 0, pow: 0, stray: game.stray || 0 };
@@ -480,6 +483,7 @@ function tick() {
   var now = performance.now(), t = now - game.t0, ch = false;
   if (game.rd) { rdTick(now); if (!game || game.done) return false; }
   if (game.cmd) { cmdTick(now); if (!game || game.done) return false; }
+  if (game.calls) comboTick(now);
   game.notes.forEach(function (n) { if (!n.st && t > n.t + WIN + 40 + S.bias) { n.st = 'miss'; ch = true; game.pop = { k: 'miss', at: now }; } });
   if (ch) recalc();
   if (!game.free && t > game.len + 1500) { finish(false); return false; }
@@ -516,15 +520,18 @@ function draw(now, t) {
     if (game.intro) { g.fillStyle = '#ffb020'; g.fillRect(W * 0.15, H * 0.63, W * 0.7 * pr, W * 0.012); g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(W * 0.15 + W * 0.7 * pr, H * 0.63, W * 0.7 * (1 - pr), W * 0.012); }
   } else game.notes.forEach(function (n) {
     var dt = n.t - t; if (dt > LA || dt < -500 || (n.st && n.st !== 'miss')) return;
-    var y = hy - dt / LA * hy, r = n.pow ? rp : rn;
+    var y = hy - dt / LA * hy, r = n.num ? (n.pow ? W * 0.12 : W * 0.085) : n.pow ? rp : rn;
+    if (n.num && y < H * 0.28) return;   // kombo paneli: nota panelin altından çıkar
     g.globalAlpha = n.st ? 0.2 : 1; g.fillStyle = n.pow ? '#ff4d6d' : '#3da5ff'; g.beginPath(); g.arc(cx, y, r, 0, 6.283); g.fill();
-    if (n.pow) { g.strokeStyle = '#ffb020'; g.lineWidth = W * 0.012; g.stroke(); g.fillStyle = '#fff'; g.font = '800 ' + Math.round(r * 0.5) + F; g.fillText('SERT', cx, y); }
+    if (n.pow) { g.strokeStyle = '#ffb020'; g.lineWidth = W * 0.012; g.stroke(); g.fillStyle = '#fff'; g.font = '800 ' + Math.round(r * (n.num ? 0.3 : 0.5)) + F; g.fillText('SERT', cx, y + (n.num ? r * 0.58 : 0)); }
+    if (n.num) { g.fillStyle = '#fff'; g.font = '800 ' + Math.round(r * (n.pow ? 0.95 : 1.25)) + F; g.fillText(n.num, cx, y - (n.pow ? r * 0.12 : 0)); }
     g.globalAlpha = 1;
   });
+  if (game.calls) drawCall(g, now, t, W, H, F);
   game.fx = game.fx.filter(function (f) { return now - f.at < 420; });
   game.fx.forEach(function (f) { var a = (now - f.at) / 420; g.globalAlpha = 1 - a; g.strokeStyle = f.pow ? '#ff4d6d' : POP[f.st][1]; g.lineWidth = W * 0.03 * (1 - a) + 2; g.beginPath(); g.arc(cx, hy, rp * (1 + 0.9 * a), 0, 6.283); g.stroke(); g.globalAlpha = 1; });
-  if (game.pop && now - game.pop.at < 600) { var pa = (now - game.pop.at) / 600; g.globalAlpha = 1 - pa; g.fillStyle = POP[game.pop.k][1]; g.font = '800 ' + Math.round(W * 0.11) + F; g.fillText(POP[game.pop.k][0], cx, H * (game.cmd ? 0.24 : game.rd ? 0.45 : game.free ? 0.17 : 0.3) - pa * H * 0.03); g.globalAlpha = 1; }
-  if (!game.free && t < 0) { g.fillStyle = '#fff'; g.font = '800 ' + Math.round(W * 0.4) + F; g.fillText(Math.min(4, Math.ceil(-t / game.beat)), cx, H * 0.4); g.font = '600 ' + Math.round(W * 0.05) + F; g.fillStyle = '#3da5ff'; g.fillText('Mavi nota: vur', cx, H * 0.56); g.fillStyle = '#ff4d6d'; g.fillText('Kırmızı büyük nota: SERT vur', cx, H * 0.56 + W * 0.075); }
+  if (game.pop && now - game.pop.at < 600) { var pa = (now - game.pop.at) / 600; g.globalAlpha = 1 - pa; g.fillStyle = POP[game.pop.k][1]; g.font = '800 ' + Math.round(W * 0.11) + F; g.fillText(POP[game.pop.k][0], cx, H * (game.cmd ? 0.24 : game.rd ? 0.45 : game.free ? 0.17 : game.calls ? 0.37 : 0.3) - pa * H * 0.03); g.globalAlpha = 1; }
+  if (!game.free && t < 0) { g.fillStyle = '#fff'; g.font = '800 ' + Math.round(W * 0.4) + F; g.fillText(Math.min(4, Math.ceil(-t / game.beat)), cx, H * 0.4); g.font = '600 ' + Math.round(W * 0.05) + F; g.fillStyle = '#3da5ff'; g.fillText(game.calls ? 'Koç komboyu söyler, sen ritimde at' : 'Mavi nota: vur', cx, H * 0.56); g.fillStyle = '#ff4d6d'; g.fillText('Kırmızı büyük nota: SERT vur', cx, H * 0.56 + W * 0.075); }
   // güç göstergesi: son vuruşun şiddeti, çizgi sert eşiği
   var bx = W * 0.9, bh = H * 0.42, by = hy + rp, lv = Math.min(1, meter.s / (S.hard * 1.15)) * Math.max(0, 1 - (now - meter.at) / 900), pl = Math.min(1, S.pw / (S.hard * 1.15));
   g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(bx - W * 0.025, by - bh, W * 0.05, bh);
@@ -737,7 +744,7 @@ function punchSnd(g, h, from, to, v, burst) {
     // "Şak" anında çalar (darbe hissi). Nota müziğin on altılık ızgarasına oturur: en çok ~0,1 sn sonra, böylece ritim dışı vuruş bile müzikle uyumlu duyulur.
     s16 = g.bgm.q / 4; pos = (t - g.a0) / s16; h.tq = pos < 0 || pos - Math.floor(pos) < 0.2 ? t : g.a0 + Math.ceil(pos) * s16;
     en.cmb = h.t - en.pl < 900 ? en.cmb + 1 : 0; en.pl = h.t;
-    k = en.cmb < 5 ? en.cmb : 3 + en.cmb % 2; h.pf = f * PST[k]; h.pv = (0.42 + 0.58 * v) * (burst ? 1.1 : 1);
+    k = en.cmb < 5 ? en.cmb : 3 + en.cmb % 2; h.pf = f * PST[k]; h.pv = (0.4 + 0.6 * Math.max(0, Math.min(1, (v - 0.35) / 0.65))) * (burst ? 1.1 : 1);
     o.gain.value = h.pv;
     nz(2200, 0.1, 0.6, t, o); tone('triangle', 240, 110, 0.1, 0.5, t, o);
     tone('sawtooth', h.pf, 0, 0.24, 0.3, h.tq, o); tone('square', h.pf * 2, 0, 0.16, 0.1, h.tq, o); tone('triangle', h.pf, 0, 0.3, 0.3, h.tq, o);
@@ -813,7 +820,7 @@ function rdChart(i, lvl, secs) {
     nx = j + 1 < G.length ? G[j + 1] : ch.len; return Math.round((j + Math.min(1, Math.max(0, (t - G[j]) / Math.max(1, nx - G[j])))) * 2) / 4;
   }
   function root(b) { var r = B.length ? B[0][1] : 130.81, m; for (m = 0; m < B.length && B[m][0] <= b + 0.001; m++) r = B[m][1]; return r; }
-  N = ch.notes.map(function (x) { return [pos(x.t), x.fq]; }); B = (ch.bass || []).map(function (x) { return [pos(x[0]), x[1]]; });
+  N = ch.notes.map(function (x) { return [pos(x.t), x.fq]; }).concat((ch.lead || []).map(function (x) { return [pos(x[0]), x[1]]; })); B = (ch.bass || []).map(function (x) { return [pos(x[0]), x[1]]; });
   loops = Math.ceil(secs / (nb * q)) + 1;
   for (k = 0; k < loops; k++) {
     o = k * nb;
@@ -1293,6 +1300,100 @@ $('sessAll').addEventListener('click', function () {
   else { ta.select(); toast('Aşağıdaki metni elle kopyala.'); }
 });
 $('devBtn').addEventListener('click', devStart); $('devCardGo').addEventListener('click', devStart);
+/* ---------- kombo parçaları: boks ritmine göre yazılmış özgün parçalar ----------
+   Her ölçü dört vuruştur ve iki yarıdan oluşur:
+   ilk yarı CEVAP: oyuncu komboyu sekizlik notalarla atar (bir-iki = iki sekizlik); yumruklar o ölçünün akorunu aşağıdan yukarı çalar.
+   ikinci yarı ÇAĞRI: koç sıradaki komboyu sayıyla söyler, ekranda yazar; arkada kısa bir ezgi cümlesi çalar.
+   Yani müzik "soru-cevap" çalar ve cevabı oyuncunun yumrukları verir. Yumruk numaraları:
+   1 sol direkt, 2 sağ direkt, 3 sol kroşe, 4 sağ kroşe, 5 sol aparkat, 6 sağ aparkat, 7-8 mideye direkt, 9-10 mideye aparkat.
+   Torbadaki telefon yumruğun türünü ayırt edemez: sayı, zamanlama ve güç ölçülür. */
+var PNUM = ['', 'bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz', 'on'];
+var PNAME = ['', 'sol direkt', 'sağ direkt', 'sol kroşe', 'sağ kroşe', 'sol aparkat', 'sağ aparkat', 'sol mide direkt', 'sağ mide direkt', 'sol mide aparkat', 'sağ mide aparkat'];
+function sf(n) { return 220 * Math.pow(2, n / 12); }   // A3'ten yarım ses sayısı -> frekans
+// akorlar: bas kökü, cevap notaları (aşağıdan yukarı), çağrı cümlesi (iki çeşit)
+var KCH = {
+  Am: { r: 110, a: [12, 15, 19, 24], m: [[19, 17, 15], [15, 17, 19]] },
+  F: { r: 174.61, a: [8, 12, 15, 20], m: [[20, 19, 15], [15, 17, 20]] },
+  C: { r: 130.81, a: [10, 15, 19, 22], m: [[22, 19, 15], [19, 22, 27]] },
+  G: { r: 98, a: [10, 14, 17, 22], m: [[17, 14, 17], [14, 17, 22]] },
+  E: { r: 164.81, a: [7, 11, 14, 19], m: [[23, 19, 14], [19, 23, 26]] },
+  Dm: { r: 146.83, a: [5, 8, 12, 17], m: [[17, 20, 17], [12, 17, 20]] }
+};
+var KL = [   // kombolar: seviye başına sekiz ölçülük bölümler
+  [[[1], [1, 2], [1], [1, 2], [1, 1], [1, 2], [2], [1, 2]],
+    [[1, 2], [1, 1, 2], [1, 2], [1, 2, 1], [1, 1], [1, 2], [1, 1, 2], [1, 2]],
+    [[1, 2], [1, 2, 3], [1, 1, 2], [1, 2, 3], [1, 2], [1, 2, 1, 2], [1, 2, 3], [1, 2, 1, 2]]],
+  [[[1, 2], [1, 1, 2], [1, 2, 3], [1, 2], [1, 1, 2], [1, 2, 3], [2, 3, 2], [1, 2, 3, 2]],
+    [[1, 2, 3], [1, 2, 3, 2], [1, 1, 2], [1, 2, 3, 4], [3, 2], [1, 2, 3, 2], [2, 3, 2], [1, 2, 1, 2]],
+    [[1, 2, 5], [1, 2, 3, 2], [1, 6, 3], [1, 2, 3, 4], [5, 2], [1, 2, 5, 2], [2, 3, 2], [1, 2, 3, 2]],
+    [[1, 2, 3, 2], [1, 1, 2, 3], [1, 2, 3, 4], [1, 2, 5, 2], [1, 6, 3, 2], [1, 2, 3, 4], [1, 2, 3, 2], [1, 2, 1, 2]]],
+  [[[1, 2, 3], [1, 2, 3, 2], [1, 1, 2], [1, 2, 3, 4], [2, 3, 2], [1, 2, 5, 2], [1, 6, 3, 2], [1, 2, 3, 4]],
+    [[1, 2, 7], [1, 2, 3, 2], [1, 8, 3], [1, 2, 7, 2], [5, 6], [1, 2, 3, 4], [1, 6, 3, 2], [1, 2, 1, 2]],
+    [[1, 2, 3, 8], [7, 2, 3], [1, 2, 5, 2], [1, 4, 3, 2], [9, 10], [1, 2, 3, 4], [1, 6, 3, 2], [1, 2, 3, 2]],
+    [[1, 1, 2, 3], [1, 2, 3, 4], [1, 2, 7, 8], [1, 2, 5, 6], [3, 4, 3, 2], [1, 2, 3, 2], [1, 6, 3, 2], [1, 2, 3, 4]],
+    [[1, 2, 3, 4], [1, 2, 5, 2], [1, 2, 3, 2], [1, 2, 7, 8], [1, 6, 3, 2], [1, 2, 3, 4], [1, 2, 3, 2], [1, 2, 1, 2]]]
+];
+function kombo(chords, bpm, rot) {
+  return function (lvl) {
+    var q = 60000 / bpm[lvl], e = q / 2, secs = KL[lvl], bars = secs.length * 8, notes = [], grid = [], bass = [], bgx = [], calls = [], lead = [], b, k, c, cb, t, sq, j, pw, m;
+    for (b = 0; b < bars; b++) {
+      t = b * 4 * q; c = KCH[chords[b % chords.length]];
+      sq = secs[(Math.floor(b / 8) + rot) % secs.length][b % 8];
+      // sert bitirici: iki ölçüde bir (kolayda dört ölçüde bir) kombonun son yumruğu
+      pw = sq.length >= 2 && b % (lvl === 0 ? 4 : 2) === 1;
+      for (j = 0; j < sq.length; j++) notes.push({ t: Math.round(t + j * e), p: pw && j === sq.length - 1 ? 5 : 1, fq: sf(c.a[j]), num: sq[j] });
+      calls.push({ t: Math.round(t - 2 * q), at: Math.round(t), seq: sq });
+      bass.push([Math.round(t), c.r], [Math.round(t + 2 * q), c.r]);
+      for (k = 0; k < 4; k++) {
+        grid.push([Math.round(t + k * q), k % 2 ? 1 : 0], [Math.round(t + (k + 0.5) * q), 2]);
+        if (k % 2) bgx.push([t + k * q, 'kick', 0.45], [t + k * q, 'bass:' + c.r, 0.3]);
+        bgx.push([t + (k + 0.5) * q, 'bass:' + c.r * 2, 0.2]);
+        if (b >= bars / 2) bgx.push([t + (k + 0.25) * q, 'hat', 0.06], [t + (k + 0.75) * q, 'hat', 0.06]);
+      }
+      if (b % 8 === 0) bgx.push([t, 'crash', 0.28]);
+      if (b % 8 === 7 && b < bars - 1) for (k = 0; k < 4; k++) bgx.push([t + (3 + k / 4) * q, 'snare', 0.16 + 0.06 * k]);
+      if (b < bars - 1) { m = c.m[Math.floor(b / 4) % 2]; for (k = 0; k < 3; k++) { lead.push([Math.round(t + (4 + k) * e), sf(m[k])]); bgx.push([t + (4 + k) * e, 'lead:' + sf(m[k]), 0.26]); } }
+    }
+    t = bars * 4 * q; cb = KCH[chords[0]];
+    bgx.push([t, 'crash', 0.4], [t, 'kick', 0.6], [t, 'chord:' + cb.r * 2, 0.4], [t, 'lead:' + sf(cb.a[3]), 0.3]);
+    return { notes: notes, grid: grid, bass: bass, len: Math.round(t), beat: q, bgx: bgx, calls: calls, lead: lead, bpm: bpm[lvl] };
+  };
+}
+SONGS.push({ n: 'Ring Ateşi', by: 'kombo · boks ritmi', build: kombo(['Am', 'F', 'C', 'G'], [104, 116, 128], 0) },
+  { n: 'Son Raund', by: 'kombo · boks ritmi', build: kombo(['Am', 'G', 'F', 'E'], [108, 120, 132], 1) });
+var KFIRST = SONGS.length - 2;
+if (!S.k125) { S.k125 = 1; S.i = KFIRST; save(); }   // ilk açılışta kombo parçası seçili gelir
+
+function sayCombo(seq) {   // koçun sesi: sayılar hızlı okunur ki ölçü başına yetişsin
+  try { var u = new SpeechSynthesisUtterance(seq.map(function (n) { return PNUM[n]; }).join(', ')); u.lang = 'tr-TR'; u.rate = 1.3; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {}
+}
+function comboTick(now) {
+  var g = game, c;
+  while (g.ci < g.calls.length && now >= g.t0 + g.calls[g.ci].t) { c = g.calls[g.ci++]; g.call = c; sayCombo(c.seq); }
+}
+function noteSnd(fq, v) {   // OYNA'da isabetli yumruk: parlak "şak" + notanın kendisi; ses gücü vuruşla büyür
+  var t = ac.currentTime, o = ac.createGain(), vn = Math.max(0, Math.min(1, (v - 0.35) / 0.65)); o.gain.value = 0.4 + 0.6 * vn; o.connect(mst);
+  nz(2200, 0.09, 0.5, t, o); tone('triangle', 240, 110, 0.09, 0.4, t, o);
+  tone('sawtooth', fq, 0, 0.26, 0.3, t, o); tone('square', fq * 2, 0, 0.16, 0.1, t, o); tone('triangle', fq, 0, 0.34, 0.4, t, o);
+}
+function comboCheer(g) {   // her on isabetlik seride kısa bir zil merdiveni (konuşma koçun sesini kesmesin diye ses)
+  if (!g.combo || g.combo % 10 || g.combo === g.cheer) return;
+  g.cheer = g.combo; var t = ac.currentTime; play('bell:1046.5', 0.3, t); play('bell:1318.5', 0.3, t + 0.07); play('bell:1568', 0.32, t + 0.14); play('crash', 0.22, t + 0.14);
+  g.pop = { k: 'seri', at: performance.now() }; POP.seri = [g.combo + ' SERİ!', '#ffb020'];
+}
+function drawCall(g, now, t, W, H, F) {   // sıradaki / şimdiki kombo: büyük sayılar ve yumruk adları
+  var c = game.call, cx = W / 2, live, n, i, x, w, hitN;
+  if (!c) return;
+  live = t >= c.at - 60; n = c.seq.length; w = W * 0.17;
+  g.fillStyle = 'rgba(16,20,24,.86)'; g.fillRect(0, H * 0.115, W, H * 0.165);
+  g.fillStyle = live ? '#3ddc97' : '#ffb020'; g.font = '700 ' + Math.round(W * 0.036) + F; g.fillText(live ? 'ŞİMDİ' : 'SIRADAKİ', cx, H * 0.137);
+  hitN = game.notes.filter(function (m) { return m.t >= c.at - 5 && m.t < c.at + 4 * game.beat - 5 && m.st && m.st !== 'miss'; }).length;
+  for (i = 0; i < n; i++) {
+    x = cx + (i - (n - 1) / 2) * w;
+    g.fillStyle = live ? (i < hitN ? '#3ddc97' : '#f2f4f5') : '#ffb020'; g.font = '800 ' + Math.round(W * 0.15) + F; g.fillText(c.seq[i], x, H * 0.2);
+  }
+  g.fillStyle = '#98a2ab'; g.font = '500 ' + Math.round(W * (n > 3 ? 0.028 : 0.034)) + F; g.fillText(c.seq.map(function (k) { return PNAME[k]; }).join(' · '), cx, H * 0.262);
+}
 var wl = null;
 function wake() { try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (l) { wl = l; }).catch(function () {}); } catch (e) {} }
 document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && running) { wake(); try { if (ac) ac.resume(); } catch (e) {} } });
