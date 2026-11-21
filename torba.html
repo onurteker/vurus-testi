@@ -46,7 +46,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 </head>
 <body>
 <div class="scr on" id="home">
-  <h1>Vuruş</h1><small class="v">Torba · v1.2.5</small>
+  <h1>Vuruş</h1><small class="v">Torba · v1.3.0</small>
   <p style="margin-top:16px"><b>Torbaya vur, şarkıyı sen çal.</b> Her vuruş melodinin bir notası; ne kadar sert vurursan o kadar güçlü çalar.</p>
   <div class="box"><b>Kurulum</b><p>1. Telefonu torbanın <b>en üst kısmına</b>, vuruş bölgesinin dışına, ekranı sana bakacak şekilde <b>sıkıca</b> bağla. Torbanın en az sallanan yeri üstüdür. Gevşek kayış yanlış sayar.<br>2. Sesi sonuna kadar aç, sessiz modu kapat.<br>3. BAŞLA'ya bas, sensör iznini ver.</p></div>
   <button id="start" class="big primary">BAŞLA</button>
@@ -120,7 +120,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 <script>
 'use strict';
 var $ = function (id) { return document.getElementById(id); };
-var VER = 'torba-1.2.5', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
+var VER = 'torba-1.3.0', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
 function pn(n) { return { h: n % 2 ? 'L' : 'R', ty: Math.floor((n - 1) / 2) }; }
 function med(a) { if (!a.length) return 0; var s = a.slice().sort(function (p, q) { return p - q; }); return s[Math.floor(s.length / 2)]; }
 function r1(v) { return Math.round(v * 10) / 10; }
@@ -402,8 +402,8 @@ function size() { var r = window.devicePixelRatio || 1; cv.width = Math.round(cv
 window.addEventListener('resize', size);
 function renderMenu() {
   dayRoll();
-  var SL = SONGS.map(function (s, i) { var b = S.best[i + '-' + S.lvl]; return '<button data-i="' + i + '" class="' + (i === S.i ? 'sel' : '') + '" style="font-size:15px">' + s.n + (b ? '<br><small class="v">en iyi ' + b + '</small>' : i >= KFIRST ? '<br><small class="v">kombo · koç söyler</small>' : '') + '</button>'; });
-  $('songs').innerHTML = SL.slice(KFIRST).concat(SL.slice(0, KFIRST)).join('');
+  var SL = SONGS.map(function (s, i) { var b = S.best[i + '-' + S.lvl]; return '<button data-i="' + i + '" class="' + (i === S.i ? 'sel' : '') + '" style="font-size:15px">' + s.n + (b ? '<br><small class="v">en iyi ' + b + '</small>' : s.trk ? '<br><small class="v">' + s.trk.g + ' · ' + Math.round(60 / s.trk.per) + '</small>' : i >= KFIRST ? '<br><small class="v">kombo · koç söyler</small>' : '') + '</button>'; });
+  $('songs').innerHTML = (typeof TFIRST === 'number' ? SL.slice(TFIRST).concat(SL.slice(KFIRST, TFIRST)) : SL.slice(KFIRST)).concat(SL.slice(0, KFIRST)).join('');
   $('lvls').innerHTML = LV.map(function (n, i) { return '<button data-i="' + i + '" class="' + (i === S.lvl ? 'sel' : '') + '">' + n + '</button>'; }).join('');
   $('thV').textContent = S.thr.toFixed(1); $('pwV').textContent = S.pw.toFixed(1); $('gd').textContent = S.guide ? 'Açık' : 'Kapalı';
   var iv = deltas.length > 30 ? med(deltas) : 0; $('warn').textContent = iv > 30 ? 'Sensör yavaş çalışıyor (' + Math.round(iv) + ' ms). Düşük güç modunu kapat; zamanlama bozulabilir.' : '';
@@ -425,11 +425,12 @@ function adjPw(d) { var o = S.pw; S.pw = r1(Math.max(1.5, Math.min(200, S.pw + d
 $('pwM').addEventListener('click', function () { adjPw(-1); }); $('pwP').addEventListener('click', function () { adjPw(1); });
 function startGame() {
   initAudio();
+  var SG = SONGS[S.i]; if (SG.trk && !(TB && TB.f === SG.trk.f)) { trkLoad(SG.trk, function (ok) { if (!ok) { S.i = KFIRST; save(); } startGame(); }); return; }
   var ch = SONGS[S.i].build(S.lvl), need = S.lvl === 0 ? 5 : 3, ev = [], k;
   var notes = ch.notes.map(function (n, i) { return { i: i, t: n.t, fq: n.fq, num: n.num || 0, pow: n.p >= need, st: null, weak: false, dt: 0, h: null }; });
   var t0 = performance.now() + 1200 + 4 * ch.beat, a0 = ac.currentTime + (t0 - performance.now()) / 1000;
   // Sesler baştan topluca değil, çalınmadan 1,6 sn önce kurulur: zayıf telefonda takılma olmaz.
-  for (k = 4; k >= 1; k--) ev.push([-k * ch.beat / 1000, 'tick', 0.6]);
+  if (!ch.trk) for (k = 4; k >= 1; k--) ev.push([-k * ch.beat / 1000, 'tick', 0.6]);
   ch.grid.forEach(function (g) { ev.push([g[0] / 1000, ['kick', 'snare', 'hat'][g[1]], [0.5, 0.25, 0.1][g[1]]]); });
   (ch.bass || []).forEach(function (g) { ev.push([g[0] / 1000, 'bass:' + g[1], 0.4]); });
   (ch.bgx || []).forEach(function (g) { ev.push([g[0] / 1000, g[1], g[2]]); });
@@ -438,6 +439,7 @@ function startGame() {
   ev.sort(function (p, q) { return p[0] - q[0]; });
   game = { i: S.i, lvl: S.lvl, notes: notes, t0: t0, a0: a0, ev: ev, ei: 0, len: ch.len, beat: ch.beat, fx: [], pop: null, dts: [], hl: [], stray: 0, score: 0, combo: 0, maxCombo: 0, mult: 1, cnt: {}, done: false, calls: ch.calls || null, ci: 0, call: null, cheer: 0 };
   stopAudio(); bg = ac.createGain(); bg.gain.value = 0.8; bg.connect(mst); lastStart = startGame;
+  if (ch.trk) { var tb0 = trkBar(ch.trk, ch.B0), lead = Math.min(tb0, 4 * ch.beat / 1000), te = a0 + ch.len / 1000; game.trk = ch.trk; bg.gain.value = 0.75; trkPlay(a0 - lead, tb0 - lead); try { bg.gain.setValueAtTime(0.75, te + 0.3); bg.gain.linearRampToValueAtTime(0, te + 1.5); } catch (e) {} }
   $('hSong').textContent = SONGS[S.i].n + ' · ' + LV[S.lvl]; mode = 'game'; recalc(); show('stage');
   cancelAnimationFrame(raf); raf = requestAnimationFrame(frame); tick(); recStart();
 }
@@ -454,13 +456,13 @@ function gameHit(h) {
   if (!best) { g.stray++; fx('tom', vol(h.s0) * 0.7); h.up = function () { if (game === g) meter.s = h.s; }; recalc(); return; }
   g.dts.push(bd); var a = g.dts.length >= 6 ? bd - med(g.dts) : bd;
   best.h = h; best.dt = Math.round(a); best.st = Math.abs(a) <= PERF ? 'perfect' : 'good'; best.weak = best.pow && h.s0 < S.pwi;
-  noteSnd(best.fq, vol(h.s0)); if (best.pow && !best.weak) fx('boom', 0.8);
+  if (g.trk) kitSnd(vol(h.s0), h.s0 >= S.pwi ? 2 : h.s0 >= S.pwi * 0.6 ? 1 : 0, false, 0.6); else { noteSnd(best.fq, vol(h.s0)); if (best.pow && !best.weak) fx('boom', 0.8); }
   g.fx.push({ st: best.st, at: now, pow: best.pow && !best.weak });
   g.pop = { k: best.weak ? 'weak' : best.pow ? 'pow' : best.st, at: now };
   h.up = function () {
     if (game !== g) return;
     meter.s = h.s;
-    if (best.weak && h.s >= S.pw) { best.weak = false; fx('boom', 0.8); g.pop = { k: 'pow', at: performance.now() }; g.fx.push({ st: best.st, at: performance.now(), pow: true }); }
+    if (best.weak && h.s >= S.pw) { best.weak = false; if (g.trk) kitSnd(1, 2, false, 0.6); else fx('boom', 0.8); g.pop = { k: 'pow', at: performance.now() }; g.fx.push({ st: best.st, at: performance.now(), pow: true }); }
     recalc();
   };
   recalc(); comboCheer(g);
@@ -539,7 +541,7 @@ function draw(now, t) {
   g.fillStyle = '#ffb020'; g.fillRect(bx - W * 0.04, by - bh * pl - 2, W * 0.08, 4);
   g.fillStyle = '#98a2ab'; g.font = '600 ' + Math.round(W * 0.035) + F; g.fillText('GÜÇ', bx, by + W * 0.04);
 }
-function stopAudio() { if (bg) { try { bg.gain.value = 0; bg.disconnect(); } catch (e) {} bg = null; } }
+function stopAudio() { trkStop(); if (bg) { try { bg.gain.value = 0; bg.disconnect(); } catch (e) {} bg = null; } }
 function fit(hl, ms) {
   var s = hl.map(function (h) { return h.s; }), sum = s.reduce(function (a, b) { return a + b; }, 0);
   return { n: s.length, avg: s.length ? Math.round(sum / s.length / S.hard * 100) : 0, max: s.length ? r1(Math.max.apply(null, hl.map(function (h) { return h.pk; }))) : 0, hard: hl.filter(strong).length, pm: ms > 5000 ? Math.round(s.length / (ms / 60000)) : 0, pts: Math.round(sum) };
@@ -646,6 +648,7 @@ function bgRoot(g, now) {
   return m.bass.length ? m.bass[k][1] : 130.81;
 }
 function seqOf(i) {   // serbest çalınan nota dizisi; her notaya o andaki bas kökü eklenir
+  if (SONGS[i].trk) i = KFIRST;
   var ch = SONGS[i].build(0), bs = ch.bass || [], k = 0;
   return ch.notes.map(function (n) { while (k + 1 < bs.length && bs[k + 1][0] <= n.t) k++; return { fq: n.fq, rt: bs.length ? bs[k][1] : 130.81 }; });
 }
@@ -737,6 +740,7 @@ function duck(tier) {   // her yumrukta müzik bir an geri çekilir (sertte daha
    0,9 saniye ara verince başa döner. Ses gücü vuruşun şiddetiyle büyür; ortada akor, sertte bas davul + zil eklenir; patlamada her yumruk zilli çalar. */
 var PST = [1, 1.5, 2, 3, 4];
 function punchSnd(g, h, from, to, v, burst) {
+  if (g.trk) { kitSnd(v, to, burst, trkLvAt(g, h.t)); duck(to); return; }
   var t = ac.currentTime, o = ac.createGain(), en = g.en, f = bgRoot(g, h.t) * 4, k, s16, pos, tq;
   if (f > 600) f /= 2;
   o.connect(mst);
@@ -853,12 +857,20 @@ function rdSched() {   // üst katlar: son anda, o anki kata göre
   while (g.xi < g.xv.length && g.a0 + g.xv[g.xi][0] < lim) { e = g.xv[g.xi++]; if (e[3] <= g.lv && g.a0 + e[0] >= t - 0.03) play(e[1], e[2], g.a0 + e[0], bg); }
 }
 function startRound() {
+  initAudio(); var SR = SONGS[S.i]; if (SR.trk && !(TB && TB.f === SR.trk.f)) { trkLoad(SR.trk, function (ok) { if (!ok) { S.i = KFIRST; save(); } startRound(); }); return; }
   initAudio(); var now = performance.now();
   game = { free: true, i: S.i, notes: [], seq: seqOf(S.i), n: 0, t0: now, beat: 600, len: 1, fx: [], pop: null, hl: [], done: false, en: enNew(),
     rd: { i: 0, n: S.rd.n, w: S.rd.w, r: S.rd.r, ph: 'prep', end: now + 5000, st: [], h0: 0, b0: 0, sec: 99, warn: false } };
   newBus(); mode = 'round'; hud('Raund 1 / ' + S.rd.n); lastStart = startRound;
   // Arkada sürekli müzik: seçili şarkı raund temposunda döner; vurdukça katman açılır (rdChart, rdLv, rdSched).
-  var A = rdChart(S.i, S.lvl, S.rd.n * (S.rd.w + S.rd.r) + 2);
+  var TT = SONGS[S.i].trk;
+  if (TT && TB && TB.f === TT.f) {   // gerçek parça: raund boyunca ölçü sınırlarında döner
+    var B0 = trkStart(TT), nb = Math.floor((TT.nb - TT.down) / 4) - 1, ls = trkBar(TT, B0), le = trkBar(TT, Math.max(B0 + 8, nb));
+    game.ev = []; game.ei = 0; game.xv = []; game.xi = 0; game.lv = 0; game.a0 = ac.currentTime + 5; game.trk = TT; game.toff = ls; game.tloop = [ls, le];
+    game.bgm = { t0: now + 5000, len: (le - ls) * 1000, bass: [], bpm: Math.round(60 / TT.per), q: TT.per }; game.bv = 0.7; bgSet(0.7); trkPlay(game.a0, ls, [ls, le]);
+    show('stage'); cancelAnimationFrame(raf); raf = requestAnimationFrame(frame); speak('Hazırlan.'); recStart(); return;
+  }
+  var A = rdChart(TT ? KFIRST : S.i, S.lvl, S.rd.n * (S.rd.w + S.rd.r) + 2);
   game.ev = A.ev; game.ei = 0; game.xv = A.xv; game.xi = 0; game.lv = 0; game.a0 = ac.currentTime + 5; game.bgm = { t0: now + 5000, len: A.len, bass: A.bass, bpm: A.bpm, q: A.q }; game.bv = 0.7; bgSet(0.7);
   show('stage'); cancelAnimationFrame(raf); raf = requestAnimationFrame(frame); speak('Hazırlan.'); recStart();
 }
@@ -1394,6 +1406,98 @@ function drawCall(g, now, t, W, H, F) {   // sıradaki / şimdiki kombo: büyük
   }
   g.fillStyle = '#98a2ab'; g.font = '500 ' + Math.round(W * (n > 3 ? 0.028 : 0.034)) + F; g.fillText(c.seq.map(function (k) { return PNAME[k]; }).join(' · '), cx, H * 0.262);
 }
+/* ---------- gerçek kayıtlı parçalar (FreePD, kamu malı / CC0) ----------
+   Ses dosyası sayfaya gömülmez: açılışta CC0 müzik arşivinden (sabit sürüm) indirilir, tarayıcı önbelleğe alır.
+   Her parçanın vuruş haritası önceden çıkarıldı (tempo, ilk vuruş, ölçü başı, vuruş başına yoğunluk 0-9).
+   OYNA: koç komboyu bir ölçü önce söyler, kombo parçanın ölçü başına sekizlik (hızlı parçada dörtlük) aralıkla oturur;
+   sakin yerde kısa/seyrek, yükselen yerde uzun kombo; parçanın en güçlü yerlerinde son yumruk SERT.
+   Yumruk sesi bir davul seti gibidir (parçanın tonuyla çatışmaz): hafif = trampet, orta = + bas davul, sert = + gümbürtü ve zil. */
+var TSHA = '655388f987eacf6d08d73080fcc3e727f267bfde';
+var TRACKS = [{"n":"Hit n Smash","g":"Elektro rock","f":"freepd.com/Hit n Smash.mp3","per":0.461538,"ph":0.053,"nb":288,"down":1,"dur":133.02,"lv":[9,9,0,0,0,0,2,4,4,4,2,2,3,4,3,3,1,0,0,0,2,4,8,8,7,5,1,1,3,3,3,3,0,0,0,0,2,4,8,8,8,7,5,5,5,5,5,5,4,4,3,3,5,6,9,9,8,7,4,4,5,6,7,7,5,5,4,5,6,7,9,9,8,8,6,6,7,7,7,6,4,4,4,5,6,7,9,9,8,7,5,5,7,7,7,6,5,5,4,5,6,6,9,9,8,8,6,4,2,1,1,2,4,4,3,3,4,4,5,4,2,2,0,0,3,5,9,9,7,5,3,3,4,5,6,5,3,3,2,2,4,6,8,9,8,7,5,4,5,6,6,6,4,4,4,4,5,7,9,9,9,7,5,5,6,7,8,8,6,5,4,5,6,7,9,9,9,9,8,7,7,8,8,7,7,6,6,6,7,8,9,9,8,7,6,6,8,9,9,9,8,8,7,7,7,8,9,9,8,8,7,7,7,8,8,8,7,7,6,7,7,8,9,9,9,8,7,7,8,9,9,9,8,8,7,7,8,8,9,9,8,7,2,2,4,4,3,3,0,0,1,1,3,5,9,9,8,6,2,2,3,4,6,5,3,2,2,3,5,6,9,9,7,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},{"n":"Take the Ride","g":"Rock","f":"freepd.com/Take the Ride.mp3","per":0.495868,"ph":0.032,"nb":528,"down":3,"dur":262.03,"lv":[9,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,4,5,6,7,7,7,7,7,6,7,7,6,6,5,5,5,5,6,6,7,7,6,6,6,6,7,7,7,7,6,6,5,5,6,7,7,7,7,6,6,6,7,7,8,7,6,6,5,5,6,7,8,8,7,6,6,6,7,7,7,6,5,5,5,5,6,6,7,7,6,6,5,6,6,7,7,6,6,5,5,5,5,6,7,7,6,6,5,5,6,7,6,6,5,4,5,5,6,7,7,7,6,6,6,6,7,7,7,6,6,5,5,5,6,7,8,8,7,7,7,7,8,8,8,8,7,7,8,8,8,8,8,8,8,8,8,7,7,7,7,7,7,7,8,7,7,7,7,7,7,8,8,7,7,8,7,7,7,7,8,8,7,7,8,8,9,9,9,9,9,9,8,8,9,8,9,9,8,8,8,8,9,9,9,9,9,9,8,8,9,8,9,9,9,9,9,8,7,6,5,5,6,6,6,6,5,5,4,4,6,6,7,7,6,5,5,5,5,6,6,6,6,5,5,5,6,6,7,7,6,4,2,1,0,0,1,3,5,4,3,2,1,2,3,4,5,4,2,1,0,0,2,4,5,4,3,1,1,2,3,5,5,6,5,6,6,6,6,5,4,4,4,4,5,6,6,6,6,5,6,6,7,7,7,6,5,5,5,5,6,7,7,7,6,5,6,6,7,7,7,7,6,5,5,5,6,7,7,8,7,6,6,6,7,7,7,7,6,5,5,5,6,6,7,7,6,6,5,6,6,6,6,6,5,4,5,4,5,6,7,7,7,6,5,5,6,6,7,6,6,5,5,5,6,6,7,7,6,6,6,6,6,7,7,6,6,5,5,5,6,7,7,8,7,7,7,7,8,8,8,8,8,7,8,8,8,8,8,8,9,9,8,7,7,7,7,7,7,7,8,8,7,7,7,7,7,8,8,7,8,8,7,7,7,7,8,8,7,7,8,8,9,9,9,9,9,9,9,9,9,8,9,9,9,8,8,9,9,9,9,9,9,9,8,8,8,9,9,9,9,8,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,7,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},{"n":"Guerilla Tactics","g":"Aksiyon","f":"freepd.com/Guerilla Tactics.mp3","per":0.5,"ph":0.1365,"nb":218,"down":0,"dur":109.19,"lv":[9,9,5,6,5,4,2,1,3,4,7,7,5,4,1,1,2,4,6,6,5,4,2,2,3,4,6,6,4,3,0,0,2,4,7,8,8,9,9,9,9,8,8,7,5,2,0,0,2,6,9,9,9,9,9,9,9,9,9,8,5,2,0,0,1,4,8,9,9,9,7,6,6,6,7,8,5,3,0,0,2,5,7,8,6,5,5,5,6,8,9,8,7,4,1,1,2,4,7,8,7,6,5,4,5,6,7,6,3,1,0,0,2,5,7,8,7,5,4,3,4,5,7,8,7,5,3,2,3,5,7,8,8,8,6,5,6,6,7,6,5,3,1,1,2,3,6,7,6,6,5,4,5,7,8,9,9,8,8,7,7,8,9,9,8,8,7,7,7,8,8,8,7,5,3,3,3,4,5,5,4,3,2,2,3,4,5,5,2,2,1,1,3,4,5,5,3,3,2,2,4,3,5,4,3,3,2,3,0,0,0,0,0,0,0,0,0,0]},{"n":"Uberpunch","g":"Hızlı · metal","f":"freepd.com/Uberpunch.mp3","per":0.4,"ph":0.2085,"nb":234,"down":2,"dur":93.88,"lv":[9,9,4,9,8,8,7,6,7,7,6,6,5,5,8,9,9,9,9,8,7,6,7,7,7,8,8,7,7,8,8,9,9,9,6,0,0,1,0,0,0,0,0,0,0,0,1,6,6,5,5,1,1,2,2,1,0,1,0,0,0,0,0,7,8,8,8,8,9,8,8,9,9,9,9,8,8,8,8,8,9,9,9,8,8,8,8,8,8,8,8,8,8,9,9,9,8,7,7,8,8,9,8,8,7,6,6,5,5,6,5,5,5,5,7,8,9,9,9,9,9,8,7,2,2,2,1,0,2,2,4,8,7,7,8,8,9,8,6,3,3,3,3,3,4,4,6,8,8,9,9,9,9,7,7,6,6,6,5,4,4,4,5,7,7,6,6,5,6,7,7,6,5,5,6,7,8,8,8,7,7,6,6,6,7,8,7,7,6,6,8,9,9,9,9,8,8,7,7,6,7,7,6,6,5,5,7,8,9,9,8,6,6,6,6,6,7,7,6,6,6,6,8,7,0,0,0,0,0,0,0,0,0,0]},{"n":"Limit 70","g":"Funk","f":"freepd.com/Limit 70.mp3","per":0.58451,"ph":0.029,"nb":516,"down":0,"dur":301.66,"lv":[9,9,0,0,0,1,1,1,1,2,2,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,2,3,4,4,4,3,2,1,1,1,2,2,2,2,2,3,3,4,4,5,5,5,4,3,2,2,1,1,1,0,0,0,0,0,1,6,8,8,7,7,7,6,6,6,6,6,6,7,7,7,7,7,7,7,7,7,7,8,8,8,8,8,7,6,5,6,7,7,8,8,8,7,7,7,7,7,7,7,7,6,8,9,9,9,9,8,8,7,7,7,7,7,7,7,7,6,5,5,4,4,5,4,5,5,5,5,5,5,4,4,5,5,6,6,6,6,5,5,5,5,5,5,5,5,5,5,5,2,0,3,4,7,9,8,8,8,8,9,9,9,9,9,9,9,8,8,8,8,9,8,7,7,7,8,9,9,9,9,8,8,7,8,9,9,9,9,8,8,7,8,8,8,8,9,9,9,9,9,9,9,9,9,9,8,8,8,8,8,8,9,9,9,9,9,9,9,9,8,7,7,7,7,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,9,9,8,7,6,7,5,6,5,5,3,3,2,3,4,5,6,6,6,7,8,7,6,6,6,6,5,4,2,2,3,3,5,5,6,7,7,8,9,9,9,9,9,8,7,8,8,8,9,9,9,9,9,9,9,9,9,9,9,9,7,7,7,7,9,8,7,6,5,6,7,8,9,8,7,7,7,7,8,8,9,9,9,9,8,8,8,7,8,8,8,9,8,8,9,9,9,9,9,9,8,9,9,8,9,8,8,8,8,8,8,8,8,8,8,8,8,8,8,9,9,9,9,9,9,8,8,7,7,7,6,7,5,6,6,5,4,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,2,2,2,1,2,2,3,3,2,2,1,1,1,1,1,0,0,1,1,2,3,4,5,4,4,3,1,0,0,0,1,1,0,0,0,0,0,3,7,8,8,8,7,7,7,7,7,7,7,7,7,7,7,8,8,7,7,7,7,6,7,7,7,8,7,6,5,4,5,6,7,9,8,8,8,8,8,8,8,8,8,7,7,8,9,9,9,8,7,7,6,7,6,6,6,6,6,6,6,4,0,0,0,0,0]}];
+var TB = null, TSRC = null, TLOAD = null;   // çözülmüş ses (yalnız son parça bellekte), çalan kaynak, süren indirme
+function trkUrls(t) { var p = t.f.split('/').map(encodeURIComponent).join('/'); return ['https://raw.githubusercontent.com/SoundSafari/CC0-1.0-Music/' + TSHA + '/' + p, 'https://cdn.jsdelivr.net/gh/SoundSafari/CC0-1.0-Music@' + TSHA + '/' + p]; }
+function trkMsg(s) { var e = $('trkMsg'); if (!e) { e = document.createElement('div'); e.id = 'trkMsg'; e.style.cssText = 'position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);background:#101418;border:1px solid #3ddc97;color:#f2f4f5;padding:18px 22px;border-radius:14px;font:600 17px system-ui;z-index:99;text-align:center;max-width:80vw'; document.body.appendChild(e); } e.innerHTML = s; e.style.display = s ? 'block' : 'none'; }
+function trkLoad(t, cb) {   // indir + çöz; bitince cb(true/false)
+  if (TB && TB.f === t.f) { cb(true); return; }
+  if (TLOAD) return;
+  if (typeof fetch !== 'function' || !ac || !ac.decodeAudioData) { toast('Bu tarayıcı parçayı indiremiyor. Sentez parça açılıyor.'); cb(false); return; }
+  var urls = trkUrls(t), k = 0;
+  TLOAD = t.f; TB = null;
+  function fail() { TLOAD = null; trkMsg(''); toast('Parça indirilemedi (internet?). Sentez parça açılıyor.'); cb(false); }
+  function go() {
+    if (k >= urls.length) { fail(); return; }
+    var u = urls[k++];
+    trkMsg('♪ ' + esc(t.n) + '<br><small>indiriliyor…</small>');
+    fetch(u).then(function (r) {
+      if (!r.ok) throw new Error('http ' + r.status);
+      var n = +r.headers.get('content-length') || 0, rd = r.body && r.body.getReader ? r.body.getReader() : null, parts = [], got = 0;
+      if (!rd) return r.arrayBuffer();
+      function pump() { return rd.read().then(function (x) { if (x.done) { var b = new Uint8Array(got), o = 0; parts.forEach(function (p) { b.set(p, o); o += p.length; }); return b.buffer; } parts.push(x.value); got += x.value.length; if (n) trkMsg('♪ ' + esc(t.n) + '<br><small>indiriliyor %' + Math.round(got / n * 100) + '</small>'); return pump(); }); }
+      return pump();
+    }).then(function (ab) {
+      trkMsg('♪ ' + esc(t.n) + '<br><small>hazırlanıyor…</small>');
+      return new Promise(function (res, rej) { var p = ac.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); });
+    }).then(function (buf) { TB = { f: t.f, buf: buf }; TLOAD = null; trkMsg(''); cb(true); }).catch(function () { go(); });
+  }
+  go();
+}
+function trkPlay(when, off, loop, t) {   // parçayı bg yoluna bağlar; loop: [başlangıç, bitiş] sn
+  trkStop(); if (!TB || !bg) return;
+  var s = ac.createBufferSource(); s.buffer = TB.buf;
+  if (loop) { s.loop = true; s.loopStart = loop[0]; s.loopEnd = loop[1]; }
+  s.connect(bg); var now = ac.currentTime; if (when < now + 0.03) { off += now + 0.03 - when; when = now + 0.03; }
+  s.start(when, Math.max(0, off)); TSRC = s;
+}
+function trkStop() { if (TSRC) { try { TSRC.stop(); } catch (e) {} try { TSRC.disconnect(); } catch (e) {} TSRC = null; } }
+function trkBar(t, b) { return t.ph + (t.down + 4 * b) * t.per; }   // b. ölçü başının parça içindeki zamanı (sn)
+function trkBarLv(t, b) { var i = t.down + 4 * b, s = 0, k; for (k = 0; k < 4; k++) s += t.lv[Math.min(t.lv.length - 1, i + k)] || 0; return s / 4; }
+function trkStart(t) {   // girişten sonra müziğin oturduğu ilk ölçü: seviye 3'ü geçen ilk ölçüden bir ölçü önce
+  var nb = Math.floor((t.nb - t.down) / 4), b; for (b = 0; b < nb; b++) if (trkBarLv(t, b) >= 3) return Math.max(0, b - 1); return 0;
+}
+// kombo havuzu: uzunluğa göre (KL'den), Zor seviyede altılıya kadar
+function kPool(lvl) {
+  var P = {}, add = function (sq) { var n = sq.length; (P[n] = P[n] || []).some(function (x) { return x.join() === sq.join(); }) || P[n].push(sq); };
+  KL[lvl].forEach(function (s) { s.forEach(add); }); if (lvl > 0) KL[lvl - 1].forEach(function (s) { s.forEach(add); });
+  [[1], [2], [1, 2]].forEach(add);
+  if (lvl === 2) [[1, 1, 2, 1, 2, 3], [1, 2, 3, 2, 1, 2], [1, 2, 1, 2, 3, 2], [1, 1, 2, 3, 2], [1, 2, 3, 4, 3]].forEach(add);
+  if (lvl >= 1) [[1, 1, 2, 3], [1, 1, 2, 1, 2], [1, 2, 3, 2, 3]].forEach(add);
+  return P;
+}
+function trkBuild(t) {
+  return function (lvl) {
+    var per = t.per, step = (per <= 0.43 || lvl === 0) ? 1 : 0.5, cyc = (lvl === 2 && step === 0.5) ? 1 : 2, maxL = lvl === 0 ? 3 : lvl === 1 ? 4 : (cyc === 1 ? 4 : 6);
+    var B0 = trkStart(t), nAll = Math.floor((t.nb - t.down) / 4), want = Math.round([62, 80, 96][lvl] / (4 * per)), nb = Math.min(nAll - B0 - 1, want), q = per * 1000;
+    nb -= nb % (2 * cyc); if (nb < 8) nb = Math.max(4, nAll - B0 - 1);
+    var P = kPool(lvl), notes = [], calls = [], b, c, L, lv, sq, j, used = {}, pool, k, tR, last = null;
+    for (b = 0; b + cyc - 1 < nb; b += cyc) {
+      tR = (cyc === 1 ? b : b + 1) * 4 * q;   // cevap: ölçü başı
+      lv = trkBarLv(t, B0 + (cyc === 1 ? b : b + 1));
+      L = lv < 1.5 ? 0 : lv < 4.5 ? 1 + (b / cyc) % 2 : lv < 6.5 ? 2 + (lvl > 0 ? (b / cyc) % 2 : 0) : lv < 8 ? 3 + (lvl > 0 ? 1 : 0) : maxL;
+      if (b === 0 && cyc === 1) L = 0;   // ilk ölçü yalnız çağrı
+      L = Math.min(L, maxL, step === 1 ? 4 : 8);
+      if (!L) continue;
+      while (!P[L]) L--;
+      pool = P[L]; k = (b * 7 + L * 3 + lvl) % pool.length; sq = pool[k];
+      if (last && sq.join() === last.join() && pool.length > 1) sq = pool[(k + 1) % pool.length];
+      last = sq;
+      for (j = 0; j < sq.length; j++) notes.push({ t: Math.round(tR + j * step * q), p: (lv >= 7.5 && j === sq.length - 1 && sq.length > 1) || (lv >= 8.5 && j === 0) ? 5 : 1, fq: 0, num: sq[j] });
+      calls.push({ t: Math.round(tR - (cyc === 1 ? 2 : 4) * q - 120), at: Math.round(tR), seq: sq });
+    }
+    return { notes: notes, grid: [], bass: [], bgx: [], calls: calls, len: Math.round(nb * 4 * q), beat: q, bpm: Math.round(60 / per), trk: t, B0: B0 };
+  };
+}
+var TFIRST = SONGS.length;
+TRACKS.forEach(function (t) { SONGS.push({ n: t.n, by: t.g + ' · gerçek kayıt', trk: t, build: trkBuild(t) }); });
+if (!S.k130) { S.k130 = 1; S.i = TFIRST; save(); }
+function kitSnd(v, tier, burst, lvNow) {   // gerçek parçada yumruk sesi: güç ve parçanın o anki yoğunluğu ile büyür
+  var t = ac.currentTime, o = ac.createGain(), vn = Math.max(0, Math.min(1, (v - 0.35) / 0.65)), g = (0.45 + 0.55 * vn) * (0.85 + 0.3 * (lvNow || 0.5)) * (burst ? 1.15 : 1);
+  o.gain.value = g; o.connect(mst);
+  nz(1800, 0.14, 0.7, t, o); tone('triangle', 230, 120, 0.12, 0.55, t, o); nz(6000, 0.05, 0.25, t, o);
+  if (tier >= 1) { tone('sine', 120, 45, 0.3, 0.9, t, o); }
+  if (tier >= 2) { tone('sine', 150, 38, 0.6, 1, t, o); nz(2500, 0.4, 0.45, t, o); nz(5200, 0.8, 0.4, t, o); }
+  if (burst) nz(5200, 0.45, 0.3, t, o);
+}
+function trkLvAt(g, now) { var t = g.trk, s = ((now - g.bgm.t0) / 1000) + g.toff, L = g.tloop, i; if (L && s > L[1]) s = L[0] + (s - L[0]) % (L[1] - L[0]); i = Math.floor((s - t.ph) / t.per); return (t.lv[Math.max(0, Math.min(t.lv.length - 1, i))] || 0) / 9; }
 var wl = null;
 function wake() { try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (l) { wl = l; }).catch(function () {}); } catch (e) {} }
 document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && running) { wake(); try { if (ac) ac.resume(); } catch (e) {} } });
