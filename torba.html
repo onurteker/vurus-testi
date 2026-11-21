@@ -46,10 +46,14 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 </head>
 <body>
 <div class="scr on" id="home">
-  <h1>Vuruş</h1><small class="v">Torba · v1.2</small>
+  <h1>Vuruş</h1><small class="v">Torba · v1.2.1</small>
   <p style="margin-top:16px"><b>Torbaya vur, şarkıyı sen çal.</b> Her vuruş melodinin bir notası; ne kadar sert vurursan o kadar güçlü çalar.</p>
   <div class="box"><b>Kurulum</b><p>1. Telefonu torbanın <b>en üst kısmına</b>, vuruş bölgesinin dışına, ekranı sana bakacak şekilde <b>sıkıca</b> bağla. Torbanın en az sallanan yeri üstüdür. Gevşek kayış yanlış sayar.<br>2. Sesi sonuna kadar aç, sessiz modu kapat.<br>3. BAŞLA'ya bas, sensör iznini ver.</p></div>
   <button id="start" class="big primary">BAŞLA</button>
+  <div id="sndBox" style="display:none">
+    <div class="box"><b>Ses kontrolü</b><p>"Sesi dene"ye bas: üç ses duymalısın. Duymuyorsan sessiz modu kapat ve ses düğmesiyle sesi aç. Bluetooth hoparlör çalışır ama sesi geç verir; kablolu hoparlör gecikme yapmaz.</p><p id="sndState" style="color:var(--ink)"></p></div>
+    <div class="g2"><button id="sndTest">Sesi dene</button><button id="sndGo" class="primary">DEVAM</button></div>
+  </div>
   <p id="msg"></p>
 </div>
 <div class="scr" id="cal"><div id="calBig"></div><div id="calDots"></div><p id="calSub"></p>
@@ -59,7 +63,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 </div>
 <div class="scr" id="menu">
   <h1>Vuruş</h1><small class="v" id="today"></small>
-  <p id="live" style="margin:6px 0 0;font-size:14px">Torbaya vur: algılanan her vuruş ses çıkarır.</p><p id="warn" style="margin:4px 0 0;font-size:14px;color:var(--bad)"></p>
+  <p id="live" style="margin:6px 0 0;font-size:14px">Torbaya vur: algılanan her vuruş ses çıkarır.</p><p id="warn" style="margin:4px 0 0;font-size:14px;color:var(--bad)"></p><p id="sndMsg" style="margin:4px 0 0;font-size:14px;color:var(--bad)"></p>
   <div class="box" id="quest"><span id="qText"></span><b id="qStreak"></b></div>
   <button id="clipA" class="primary" style="display:none;width:100%">Son klibi paylaş</button>
   <h2>Şarkı</h2><div class="g3" id="songs"></div>
@@ -81,6 +85,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
     <div class="row"><span>Sert vuruş eşiği</span><span><button id="pwM">−</button> <b id="pwV"></b> <button id="pwP">+</button></span></div>
     <div class="row"><span>Kılavuz ses</span><span><button id="gd"></button></span></div>
     <div class="row"><span>Klip kaydı <small class="v">deneme</small></span><span><button id="clipM" style="padding:4px 12px"></button></span></div>
+    <div class="row"><span>Ses</span><span><button id="sndT2" style="padding:4px 12px">Ses testi</button></span></div>
     <div class="row"><span>Torba ayarı</span><span><button id="recal" style="padding:4px 12px">Yeniden ayarla</button></span></div>
     <p style="margin:4px 0 0;font-size:14px">Vurmadan ses çıkıyorsa vuruş eşiğini büyüt; hafif vuruşlar kaçıyorsa küçült.</p>
   </div>
@@ -111,7 +116,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 <script>
 'use strict';
 var $ = function (id) { return document.getElementById(id); };
-var VER = 'torba-1.2', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
+var VER = 'torba-1.2.1', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
 function pn(n) { return { h: n % 2 ? 'L' : 'R', ty: Math.floor((n - 1) / 2) }; }
 function med(a) { if (!a.length) return 0; var s = a.slice().sort(function (p, q) { return p - q; }); return s[Math.floor(s.length / 2)]; }
 function r1(v) { return Math.round(v * 10) / 10; }
@@ -207,9 +212,8 @@ function initAudio() {
   var AC = window.AudioContext || window.webkitAudioContext; ac = new AC({ latencyHint: 'interactive' });
   var len = Math.floor(ac.sampleRate * 0.5); noise = ac.createBuffer(1, len, ac.sampleRate);
   var d = noise.getChannelData(0); for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-  mst = ac.createGain(); mst.gain.value = 1; cmp = mst;
-  if (ac.createDynamicsCompressor) { try { cmp = ac.createDynamicsCompressor(); cmp.threshold.value = -4; cmp.knee.value = 2; cmp.ratio.value = 16; cmp.attack.value = 0.002; cmp.release.value = 0.12; mst.connect(cmp); } catch (e) { cmp = mst; } }
-  cmp.connect(ac.destination);
+  mst = ac.createGain(); mst.gain.value = 0.8; cmp = mst; mst.connect(ac.destination);
+  try { ac.onstatechange = sndWarn; } catch (e) {}
   ac.resume();
 }
 function tone(type, f0, f1, dur, peak, t, out) {
@@ -343,15 +347,15 @@ function calHit(h) {
 }
 function calDone() {
   var mk = function (a, k) { return med(a.map(function (x) { return x[k]; })); }, c = calS;
-  var l = mk(c.v[0], 's'), hd = mk(c.v[1], 's'), lp0 = mk(c.v[0], 'pk'), hp0 = mk(c.v[1], 'pk'), near = hd < l * 1.3;
+  var l = mk(c.v[0], 's'), hd = Math.max.apply(null, c.v[1].map(function (x) { return x.s; })), lp0 = mk(c.v[0], 'pk'), hp0 = Math.max.apply(null, c.v[1].map(function (x) { return x.pk; })), near = hd < l * 1.3;
   if (near) { hd = l * 1.6; hp0 = Math.max(hp0, lp0 * 1.6); }
   S.light = r1(l); S.hard = r1(hd); S.lp = r1(lp0); S.hp = r1(hp0); S.base = r1(c.base);
-  S.thr = r1(Math.max(1.2, 0.4 * lp0, 3 * c.base)); S.pw = r1(l + 0.6 * (hd - l)); S.pwi = r1(lp0 + 0.75 * (hp0 - lp0)); S.cal = 1; S.arc = 0; var hadLb = S.lb.length; S.lb = []; save();
+  S.thr = r1(Math.max(1.2, 0.4 * lp0, 3 * c.base)); S.pw = r1(l + 0.6 * (hd - l)); S.pwi = r1(lp0 + 0.75 * (hp0 - lp0)); S.cal = 1; S.calOk = 1; S.arc = 0; var hadLb = S.lb.length; S.lb = []; save();
   calS = null; mode = 'idle'; fx('boom', 0.7); speak('Hazır.');
   toast(near ? 'Hafif ve sert vuruşların birbirine çok yakın çıktı; sert eşiğini menüden elle ayarlayabilirsin.' : 'Ayar tamam.' + (hadLb ? ' Güç makinesi sıralaması sıfırlandı.' : ''));
   if (!S.first) { S.first = 1; save(); startFree(true); } else { renderMenu(); show('menu'); }
 }
-$('calSkip').addEventListener('click', function () { calS = null; mode = 'idle'; S.cal = 1; S.first = 1; save(); renderMenu(); show('menu'); toast('Varsayılan ayarla devam. İstediğin zaman "Yeniden ayarla"ya bas.'); });
+$('calSkip').addEventListener('click', function () { calS = null; mode = 'idle'; S.cal = 1; S.calOk = 0; S.first = 1; save(); renderMenu(); show('menu'); toast('Varsayılan ayarla devam. İstediğin zaman "Yeniden ayarla"ya bas.'); });
 setInterval(function () {
   if (mode === 'cal' && calS && calS.step >= 0 && performance.now() - calS.evt > 8000) $('calSub').textContent = 'Vuruş algılanmadı. Biraz daha sert vur; olmuyorsa telefonu daha sıkı bağla ya da biraz aşağıya al.';
 }, 1000);
@@ -827,10 +831,10 @@ function arcHit(h) {
   g.ph = 'meas'; fx('boom', 1); g.hl.push(h); g.fx.push({ st: 'perfect', at: h.t, pow: true });
   h.up = function () {
     if (game !== g) return;
-    var v = Math.max(1, Math.min(999, Math.round(600 * (0.7 * h.s / S.hard + 0.3 * h.pk / S.hp)))), dur = 700 + v, n = Math.floor(dur / 55), i, o = ac.createGain(), t = ac.currentTime;
+    var v = Math.max(1, Math.min(999, Math.round(500 * Math.pow(Math.max(0.01, 0.7 * h.s / S.hard + 0.3 * h.pk / S.hp), 0.7)))), dur = 700 + v, n = Math.floor(dur / 55), i, o = ac.createGain(), t = ac.currentTime;
     o.gain.value = 0.25; o.connect(mst);
     for (i = 0; i < n; i++) tone('square', 250 + v * 1.6 * i / n, 0, 0.04, 0.5, t + i * 0.055, o);
-    g.cur = v; g.ph = 'roll'; g.pt = performance.now(); g.dur = dur; g.sc.push(v);
+    g.raw = r1(h.s); g.cur = v; g.ph = 'roll'; g.pt = performance.now(); g.dur = dur; g.sc.push(v);
     log.arc.push([v, r1(h.s), r1(h.pk)]); if (log.arc.length > 60) log.arc.shift(); quest('arc', v);
     setTimeout(function () {
       if (game !== g) return;
@@ -862,6 +866,7 @@ function drawArc(g, now, W, H, F) {
     if (a.ph !== 'roll') {
       g.font = '800 ' + Math.round(W * 0.085) + F; g.fillText(a.ph === 'end' ? 'EN İYİ · ' + rk[1] : rk[1], cx, y0 + W * 0.27);
       if (a.rec && a.ph === 'show') { g.fillStyle = '#ffb020'; g.fillText('YENİ REKOR!', cx, y0 + W * 0.4); }
+      if (a.ph === 'show' && a.raw) { g.fillStyle = '#98a2ab'; g.font = '500 ' + Math.round(W * 0.04) + F; g.fillText('ölçüm ' + a.raw + ' m/s²', cx, y0 + W * 0.52); }
     }
     if (a.ph === 'end') {
       g.fillStyle = '#98a2ab'; g.font = '500 ' + Math.round(W * 0.045) + F; g.fillText(a.sc.join(' · '), cx, y0 + W * 0.37);
@@ -919,6 +924,8 @@ $('recal').addEventListener('click', calStart); $('arc').addEventListener('click
 /* ---------- güç makinesi: oyuncu adı ve sıralama (bu telefonda saklanır) ---------- */
 function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
 function arcBox() {
+  // Puanlar torba ayarına göre ölçeklenir: ayar atlanmışsa önce gerçek ayar yapılır.
+  if (!S.calOk) { toast('Güç makinesi için önce torba ayarı gerekli: üç hafif, üç sert vuruş.'); calStart(); return; }
   $('who').value = S.who || '';
   $('names').innerHTML = S.lb.slice(0, 12).map(function (x) { return '<button data-n="' + esc(x.n) + '"' + (x.n === S.who ? ' class="sel"' : '') + '>' + esc(x.n) + '</button>'; }).join('');
   $('lb').innerHTML = S.lb.length ? S.lb.slice(0, 10).map(function (x, i) { return '<li' + (x.n === S.who ? ' class="me"' : '') + '><span>' + (i + 1) + '. ' + esc(x.n) + '</span><span>' + x.v + '</span></li>'; }).join('') : '<li><span style="color:var(--dim)">Henüz kimse vurmadı</span></li>';
@@ -942,13 +949,13 @@ $('lbClr').addEventListener('click', function () {
 });
 $('gd').addEventListener('click', function () { S.guide = S.guide ? 0 : 1; save(); renderMenu(); });
 function dataObj() {
-  return { ver: VER, ua: navigator.userAgent.replace(/^.*?\((.*?)\).*$/, '$1'), int: r1(med(deltas)), maxM: r1(maxM), sup: sup,
+  return { ver: VER, snd: ac ? ac.state : 'yok', ua: navigator.userAgent.replace(/^.*?\((.*?)\).*$/, '$1'), int: r1(med(deltas)), maxM: r1(maxM), sup: sup,
     set: { thr: S.thr, pw: S.pw, pwi: S.pwi, light: S.light, hard: S.hard, lp: S.lp, hp: S.hp, base: S.base, bias: S.bias, guide: S.guide }, base: log.base, games: log.games.map(lite), arc: log.arc, free: log.free, q: S.q, streak: S.streak, lb: S.lb.slice(0, 5), clip: S.clip,
     hits: log.hits.map(function (h) { return [h.k, Math.round(h.t), r1(h.s0), r1(h.s), r1(h.pk)]; }), win: log.hits.filter(function (h) { return h.w; }).slice(-40).map(function (h) { return h.w; }) };
 }
 $('rep').addEventListener('click', function () {
   var d = dataObj(), J = JSON.stringify, txt = 'Vuruş ' + d.ver + ' raporu\n' +
-    'cihaz: ' + d.ua + ' | sensör aralığı: ' + d.int + ' ms | en büyük ölçüm: ' + d.maxM + ' m/s²\n' +
+    'cihaz: ' + d.ua + ' | sensör aralığı: ' + d.int + ' ms | en büyük ölçüm: ' + d.maxM + ' m/s² | ses motoru: ' + d.snd + '\n' +
     'ayar: ' + J(d.set) + '\n' +
     'bastırılan tetikleme [eğim, yankı, zemin]: ' + J(d.sup) + ' | zemin rms (son 20): ' + J(d.base.slice(-20)) + '\n' +
     'oyunlar (son 5): ' + J(d.games.slice(-5)) + '\n' +
@@ -1037,6 +1044,27 @@ $('clipM').addEventListener('click', function () {
   if (S.clip === 2) camOn(); else camOff();
   save(); renderMenu();
 });
+// iOS: izin penceresi ya da arka plana geçiş ses motorunu durdurabilir. Her dokunuş onu yeniden başlatır.
+function wakeAudio() { try { if (ac && ac.state !== 'running') ac.resume(); } catch (e) {} }
+['pointerdown', 'touchend', 'click'].forEach(function (n) { document.addEventListener(n, wakeAudio, true); });
+// iPhone'da sessiz mod web sesini kısar (konuşma sesi yine duyulur). Sessiz bir ses dosyasını döngüde çalmak sayfayı "medya" yapar ve ses açılır.
+function unmuteIOS() {
+  try {
+    if (unmuteIOS.a || !(/iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1))) return;
+    var n = 4000, b = new ArrayBuffer(44 + n), v = new DataView(b), i, w = function (o, t) { for (var j = 0; j < t.length; j++) v.setUint8(o + j, t.charCodeAt(j)); };
+    w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVEfmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, 'data'); v.setUint32(40, n, true);
+    for (i = 0; i < n; i++) v.setUint8(44 + i, 128);
+    var a = unmuteIOS.a = new Audio(URL.createObjectURL(new Blob([b], { type: 'audio/wav' }))); a.loop = true; a.setAttribute('playsinline', ''); a.play().catch(function () {});
+  } catch (e) {}
+}
+function sndWarn() { try { $('sndMsg').textContent = ac && ac.state !== 'running' && running ? 'Ses motoru durmuş görünüyor: ekrana bir kez dokun.' : ''; } catch (e) {} }
+function sndTest() {
+  initAudio(); unmuteIOS(); wakeAudio(); var t = ac.currentTime + 0.05; play('bell:880', 0.9, t); play('kick', 1, t + 0.3); play('bell:1320', 0.9, t + 0.6);
+  setTimeout(function () { var m = 'Ses motoru: ' + (ac.state === 'running' ? 'çalışıyor' : ac.state) + '. Üç ses duymalısın.'; $('sndState').textContent = m; if (running) toast(m); sndWarn(); }, 400);
+}
+function ready() { $('start').style.display = 'none'; $('sndBox').style.display = 'block'; $('msg').textContent = ''; }
+$('sndTest').addEventListener('click', sndTest); $('sndT2').addEventListener('click', sndTest);
+$('sndGo').addEventListener('click', function () { initAudio(); unmuteIOS(); wakeAudio(); play('bell:880', 0.6); $('sndBox').style.display = 'none'; begin(); });
 var wl = null;
 function wake() { try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (l) { wl = l; }).catch(function () {}); } catch (e) {} }
 document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && running) { wake(); try { if (ac) ac.resume(); } catch (e) {} } });
@@ -1050,8 +1078,8 @@ $('start').addEventListener('click', function () {
   if (!window.isSecureContext) { $('msg').textContent = 'Sensör için sayfa https ile açılmalı.'; return; }
   if (typeof DeviceMotionEvent === 'undefined') { $('msg').textContent = 'Bu cihazda hareket sensörü yok.'; return; }
   if (typeof DeviceMotionEvent.requestPermission === 'function') {
-    DeviceMotionEvent.requestPermission().then(function (r) { if (r === 'granted') begin(); else $('msg').textContent = 'Sensör izni verilmedi. Sayfayı yenileyip izin ver.'; }).catch(function () { $('msg').textContent = 'Sensör izni alınamadı.'; });
-  } else begin();
+    DeviceMotionEvent.requestPermission().then(function (r) { if (r === 'granted') ready(); else $('msg').textContent = 'Sensör izni verilmedi. Sayfayı yenileyip izin ver.'; }).catch(function () { $('msg').textContent = 'Sensör izni alınamadı.'; });
+  } else ready();
 });
 </script>
 </body>
