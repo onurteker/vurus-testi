@@ -46,7 +46,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 </head>
 <body>
 <div class="scr on" id="home">
-  <h1>Vuruş</h1><small class="v">Torba · v1.3.0</small>
+  <h1>Vuruş</h1><small class="v">Torba · v1.3.1</small>
   <p style="margin-top:16px"><b>Torbaya vur, şarkıyı sen çal.</b> Her vuruş melodinin bir notası; ne kadar sert vurursan o kadar güçlü çalar.</p>
   <div class="box"><b>Kurulum</b><p>1. Telefonu torbanın <b>en üst kısmına</b>, vuruş bölgesinin dışına, ekranı sana bakacak şekilde <b>sıkıca</b> bağla. Torbanın en az sallanan yeri üstüdür. Gevşek kayış yanlış sayar.<br>2. Sesi sonuna kadar aç, sessiz modu kapat.<br>3. BAŞLA'ya bas, sensör iznini ver.</p></div>
   <button id="start" class="big primary">BAŞLA</button>
@@ -120,7 +120,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 <script>
 'use strict';
 var $ = function (id) { return document.getElementById(id); };
-var VER = 'torba-1.3.0', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
+var VER = 'torba-1.3.1', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
 function pn(n) { return { h: n % 2 ? 'L' : 'R', ty: Math.floor((n - 1) / 2) }; }
 function med(a) { if (!a.length) return 0; var s = a.slice().sort(function (p, q) { return p - q; }); return s[Math.floor(s.length / 2)]; }
 function r1(v) { return Math.round(v * 10) / 10; }
@@ -456,13 +456,14 @@ function gameHit(h) {
   if (!best) { g.stray++; fx('tom', vol(h.s0) * 0.7); h.up = function () { if (game === g) meter.s = h.s; }; recalc(); return; }
   g.dts.push(bd); var a = g.dts.length >= 6 ? bd - med(g.dts) : bd;
   best.h = h; best.dt = Math.round(a); best.st = Math.abs(a) <= PERF ? 'perfect' : 'good'; best.weak = best.pow && h.s0 < S.pwi;
-  if (g.trk) kitSnd(vol(h.s0), h.s0 >= S.pwi ? 2 : h.s0 >= S.pwi * 0.6 ? 1 : 0, false, 0.6); else { noteSnd(best.fq, vol(h.s0)); if (best.pow && !best.weak) fx('boom', 0.8); }
+  if (g.trk) kitClick(false); else { noteSnd(best.fq, vol(h.s0)); if (best.pow && !best.weak) fx('boom', 0.8); }
   g.fx.push({ st: best.st, at: now, pow: best.pow && !best.weak });
   g.pop = { k: best.weak ? 'weak' : best.pow ? 'pow' : best.st, at: now };
   h.up = function () {
     if (game !== g) return;
     meter.s = h.s;
-    if (best.weak && h.s >= S.pw) { best.weak = false; if (g.trk) kitSnd(1, 2, false, 0.6); else fx('boom', 0.8); g.pop = { k: 'pow', at: performance.now() }; g.fx.push({ st: best.st, at: performance.now(), pow: true }); }
+    if (g.trk) kitBody(vol2(h.s), h.s >= S.pw ? 2 : h.s >= S.light + 0.5 * (S.pw - S.light) ? 1 : 0, false, 0.6);
+    if (best.weak && h.s >= S.pw) { best.weak = false; if (!g.trk) fx('boom', 0.8); g.pop = { k: 'pow', at: performance.now() }; g.fx.push({ st: best.st, at: performance.now(), pow: true }); }
     recalc();
   };
   recalc(); comboCheer(g);
@@ -740,7 +741,7 @@ function duck(tier) {   // her yumrukta müzik bir an geri çekilir (sertte daha
    0,9 saniye ara verince başa döner. Ses gücü vuruşun şiddetiyle büyür; ortada akor, sertte bas davul + zil eklenir; patlamada her yumruk zilli çalar. */
 var PST = [1, 1.5, 2, 3, 4];
 function punchSnd(g, h, from, to, v, burst) {
-  if (g.trk) { kitSnd(v, to, burst, trkLvAt(g, h.t)); duck(to); return; }
+  if (g.trk) { if (from === 0) kitClick(burst); duck(to); return; }
   var t = ac.currentTime, o = ac.createGain(), en = g.en, f = bgRoot(g, h.t) * 4, k, s16, pos, tq;
   if (f > 600) f /= 2;
   o.connect(mst);
@@ -768,21 +769,20 @@ function enHit(g, h) {
   var en = g.en, now = h.t, n = g.bgm ? { fq: 0, rt: bgRoot(g, now) } : g.seq[g.n % g.seq.length], v = vol(h.s0), burst, t0, rel;
   enDecay(en, now); burst = now < en.bEnd;
   g.n++; g.hl.push(h); meter = { s: h.s0 * S.hard / S.hp, at: now };
-  t0 = h.s0 >= S.pwi ? 2 : h.s0 >= S.lp + 0.5 * (S.pwi - S.lp) ? 1 : 0; h.tier = t0;
+  t0 = 0; h.tier = 0;   // v1.3.1: kademe şiddet ölçülünce (h.up, ~80 ms) belirlenir; anlık ölçüm güvenilmez
   // Arkada müzik çalarken (raund) vuruş melodi çalmaz: davul vurur, sertleştikçe o anki akor ve bas davul eklenir.
   if (g.bgm) punchSnd(g, h, 0, t0, v, burst); else { play('pluck:' + n.fq, v, 0, bg); layer(n, 1, t0, burst, v); }
   if (g.bgm) en.last = now; else bandHit(en, now);   // raundda tempo şarkınındır; son vuruş anı patlamanın sürmesi ve durunca sönme için tutulur
-  if (!burst) {
-    rel = Math.max(0, Math.min(1, (h.s0 - S.thr) / Math.max(1, S.hp - S.thr)));
-    en.e = Math.min(1, en.e + (g.bgm ? 0.03 + 0.06 * rel : 0.02 + 0.05 * rel));   // raundda çubuk biraz daha çabuk dolar
-    if (en.e >= 1) burstGo(g, now);
-  }
+  // v1.3.1: çubuk her vuruşta sabit dolar, gücün katkısı şiddet ölçülünce (h.up) eklenir; anlık ölçüm (s0) güvenilmez çıktı
+  if (!burst && !g.intro) { en.e = Math.min(1, en.e + (g.bgm ? 0.05 : 0.02)); if (en.e >= 1) burstGo(g, now); }
   en.score += (10 + 10 * t0) * (burst ? 2 : 1);
   g.fx.push({ st: 'perfect', at: now, pow: t0 === 2 }); if (t0 === 2 && !(g.pop && g.pop.k === 'burst' && now - g.pop.at < 500)) g.pop = { k: 'pow', at: now };
   h.up = function () {
     if (game !== g) return;
     meter.s = h.s;
     var t1 = h.s >= S.pw ? 2 : h.s >= S.light + 0.5 * (S.pw - S.light) ? 1 : 0, at = performance.now();
+    if (at >= en.bEnd && !g.intro) { en.e = Math.min(1, en.e + (g.bgm ? 0.07 : 0.05) * Math.min(1, h.s / S.pw)); if (en.e >= 1) burstGo(g, at); }
+    if (g.trk) { kitBody(vol2(h.s), t1, at < en.bEnd, trkLvAt(g, at)); en.tiers[t1]++; if (t1 === 2) { en.score += 20; g.pop = { k: 'pow', at: at }; g.fx.push({ st: 'perfect', at: at, pow: true }); } h.tier = t1; return; }
     if (t1 > h.tier) {
       if (g.bgm) punchSnd(g, h, h.tier + 1, t1, v, at < en.bEnd); else layer(n, h.tier + 1, t1, at < en.bEnd, v);
       en.score += 10 * (t1 - h.tier);
@@ -1292,7 +1292,7 @@ function devDone() {
   // 2) hafif, orta, sert ayrışıyorsa güç eşikleri gerçek ölçümlerden kurulur
   if (R.hafif.n >= 3 && R.orta.n >= 3 && R.sert.n >= 3 && M > L * 1.1 && H > M * 1.15) {
     S.light = r1(L); S.hard = r1(H); S.lp = r1(med(g('hafif', 'pk'))); S.hp = r1(med(g('sert', 'pk')));
-    S.pw = r1((M + H) / 2); S.pwi = r1((med(g('orta', 'pk')) + med(g('sert', 'pk'))) / 2); S.calOk = 1; S.arc = 0; S.lb = [];
+    S.pw = r1(M + 0.35 * (H - M)); S.pwi = S.pw;   // v1.3.1: pwi tepe (pk) değil şiddet ölçeğinde S.calOk = 1; S.arc = 0; S.lb = [];
     note.push('Hafif ' + r1(L) + ', orta ' + r1(M) + ', sert ' + r1(H) + ': üç kademe ayrışıyor, eşikler buna göre kuruldu.');
   } else note.push('Hafif ' + r1(L) + ', orta ' + r1(M) + ', sert ' + r1(H) + ': kademeler net ayrışmadı, önceki ayar korundu.');
   note.push('Sayılan vuruş: hafif ' + R.hafif.n + '/5, orta ' + R.orta.n + '/5, sert ' + R.sert.n + '/5, bir-iki ' + R.ikili.n + '/10.');
@@ -1489,6 +1489,19 @@ function trkBuild(t) {
 var TFIRST = SONGS.length;
 TRACKS.forEach(function (t) { SONGS.push({ n: t.n, by: t.g + ' · gerçek kayıt', trk: t, build: trkBuild(t) }); });
 if (!S.k130) { S.k130 = 1; S.i = TFIRST; save(); }
+if (S.dev && !S.k131 && S.pwi > S.pw * 1.2) { S.pw = r1(S.light + 0.67 * (S.hard - S.light) * 0.9); S.pwi = S.pw; S.lb = []; } S.k131 = 1;
+function vol2(s) { return Math.max(0.3, Math.min(1, 0.3 + 0.7 * s / Math.max(10, S.hard))); }   // şiddet (s) ile ses gücü
+function kitClick(burst) {   // vuruş anında hemen: kısa darbe (şiddet ~80 ms sonra ölçülür, gövde o zaman eklenir)
+  var t = ac.currentTime, o = ac.createGain(); o.gain.value = burst ? 0.75 : 0.6; o.connect(mst);
+  nz(3000, 0.05, 0.6, t, o); tone('triangle', 260, 140, 0.06, 0.5, t, o);
+}
+function kitBody(v, tier, burst, lvNow) {   // gövde: hafif trampet, orta + bas davul, sert + gümbürtü ve zil; ses gücü şiddetle büyür
+  var t = ac.currentTime, o = ac.createGain(); o.gain.value = v * (0.85 + 0.3 * (lvNow || 0.5)) * (burst ? 1.15 : 1); o.connect(mst);
+  nz(1800, 0.14, 0.7, t, o); tone('triangle', 220, 110, 0.14, 0.55, t, o);
+  if (tier >= 1) tone('sine', 120, 45, 0.3, 0.9, t, o);
+  if (tier >= 2) { tone('sine', 150, 38, 0.6, 1, t, o); nz(2500, 0.4, 0.45, t, o); nz(5200, 0.8, 0.4, t, o); }
+  if (burst) nz(5200, 0.45, 0.3, t, o);
+}
 function kitSnd(v, tier, burst, lvNow) {   // gerçek parçada yumruk sesi: güç ve parçanın o anki yoğunluğu ile büyür
   var t = ac.currentTime, o = ac.createGain(), vn = Math.max(0, Math.min(1, (v - 0.35) / 0.65)), g = (0.45 + 0.55 * vn) * (0.85 + 0.3 * (lvNow || 0.5)) * (burst ? 1.15 : 1);
   o.gain.value = g; o.connect(mst);
