@@ -72,7 +72,7 @@ nav button.on{color:var(--hit);font-weight:700;background:var(--panel)}
 </head>
 <body>
 <main>
-  <header><h1>Vuruş</h1><span id="ver">v0.5</span><span id="badge"></span></header>
+  <header><h1>Vuruş</h1><span id="ver">v0.7</span><span id="badge"></span></header>
   <button id="start">BAŞLAT</button>
   <div id="msg"></div>
 
@@ -82,6 +82,9 @@ nav button.on{color:var(--hit);font-weight:700;background:var(--panel)}
     <p class="note" id="hint"></p>
     <h2>Bu telefon hangi elde</h2>
     <div class="g2" id="hands"><button data-v="L">Sol el</button><button data-v="R">Sağ el</button></div>
+    <h2>Telefon nerede?</h2>
+    <div class="g2" id="places"><button data-v="0">Bilekte</button><button data-v="1">Torbada</button></div>
+    <p class="note" id="bagNote" style="display:none">Torba modu: telefon torbaya sıkıca bağlı. Öğretme gerekmez; her darbe şarkının sıradaki notasını çalar (Jingle Bells), vuruş gücü sesi belirler. Telefonu vuruş bölgesinin dışına, torbanın üstüne ya da arkasına bağla. Darbe algılanmıyorsa Veri sekmesinden hassasiyeti düşür.</p>
     <h2>Ses paketi</h2>
     <div class="g3" id="packs"></div>
     <h2>Eşlik ritmi</h2>
@@ -112,11 +115,13 @@ nav button.on{color:var(--hit);font-weight:700;background:var(--panel)}
   <section class="view" id="v-teach">
     <p class="note">Sistem senin yumruklarını öğrenir. Sırayla direkt, kroşe ve aparkatı sekizer kez at. Her yakalanan yumrukta kısa bir bip duyarsın, tip değişirken sesli uyarı gelir. Diğerlerine benzemeyen örnekler otomatik atılır.</p>
     <div class="card" id="calStatus"></div>
+    <p style="font-size:14px"><b>Numaralar:</b> 1 sol direkt · 2 sağ direkt · 3 sol kroşe · 4 sağ kroşe · 5 sol aparkat · 6 sağ aparkat · 7 sol mideye direkt · 8 sağ mideye direkt · 9 sol mideye aparkat · 10 sağ mideye aparkat. Tek sayılar sol, çift sayılar sağ el.</p>
     <button id="calStart" class="wide primary">Öğretmeye başla</button>
+    <button id="calMore" class="wide" style="display:none;margin-top:8px"></button>
     <div class="note" id="calResult"></div>
     <h2>Örnek ekle</h2>
     <p class="note">Eski örnekler silinmez. Bir yumruk karışıyorsa ya da telefonun yeri hafif değiştiyse o yumruktan 5 örnek daha ekle. Gard hareketi ses çıkarıyorsa "Gard örneği topla" ile sisteme neyin yumruk olmadığını öğret.</p>
-    <div class="g3" id="addRow"><button data-c="0">+5 Direkt</button><button data-c="1">+5 Kroşe</button><button data-c="2">+5 Aparkat</button></div>
+    <div class="g3" id="addRow"><button data-c="0">+5 Direkt</button><button data-c="1">+5 Kroşe</button><button data-c="2">+5 Aparkat</button><button data-c="3">+5 Mideye direkt</button><button data-c="4">+5 Mideye aparkat</button></div>
     <button id="negBtn" class="wide">Gard örneği topla (20 sn)</button>
     <button id="calClear" class="wide">Öğrenileni sil</button>
   </section>
@@ -174,14 +179,30 @@ nav button.on{color:var(--hit);font-weight:700;background:var(--panel)}
 <script src="https://unpkg.com/mqtt@5.16.1/dist/mqtt.min.js"></script>
 <script>
 /* CORE-START */
-var TYPES = ['Direkt', 'Kroşe', 'Aparkat'];
+var TYPES = ['Direkt', 'Kroşe', 'Aparkat', 'Mideye direkt', 'Mideye aparkat'], NT = TYPES.length, NEG = NT;   // NEG: gard, yumruk değil
+function zeros(n, m) { var a = [], i; for (i = 0; i < n; i++) a.push(m ? zeros(m) : 0); return a; }
+// Yumruk numaraları: 1 sol direkt, 2 sağ direkt, 3 sol kroşe, 4 sağ kroşe, 5 sol aparkat, 6 sağ aparkat, 7-8 mideye direkt, 9-10 mideye aparkat.
+function pnum(ty) { return ty * 2 + (S.hand === 'L' ? 1 : 2); }
+function tLabel(ty) { return pnum(ty) + ' · ' + TYPES[ty]; }
+function tSay(ty) { return NUM[pnum(ty) - 1] + '. ' + (S.hand === 'L' ? 'Sol ' : 'Sağ ') + TYPES[ty].toLowerCase(); }
 // Yumruğun bittiği andaki frenlemeyi yakalar.
 function makeDetector(cfg) {
   var state = 'idle', dir = null, peak = 0, tStart = 0, until = 0;
-  function fire(s, t) { state = 'refractory'; until = t + cfg.refractory; cfg.onHit(s, t, tStart); }
+  // onHit false dönerse (hareket tanınmadı: geri çekme, gard hareketi) dinlenmeye geçilmez;
+  // o anki ivme yönüyle yeniden kurulur ki hemen ardından gelen gerçek yumruk kaçmasın.
+  function fire(s, t, x, y, z, mag) {
+    if (cfg.onHit(s, t, tStart) === false && mag > 1e-6) { dir = [x / mag, y / mag, z / mag]; peak = mag; tStart = t; state = 'armed'; return; }
+    state = 'refractory'; until = t + cfg.refractory;
+  }
   return {
     sample: function (x, y, z, t) {
       var T = cfg.threshold, mag = Math.sqrt(x * x + y * y + z * z);
+      if (cfg.bag) {   // torba: darbe anında, beklemeden tetikler; torbanın salınımı dinene kadar yenisini saymaz
+        if (state === 'refractory') { if (t >= until && (mag < T * 0.6 || t >= until + 300)) state = 'idle'; }
+        else if (mag > T) { state = 'refractory'; until = t + 140; cfg.onHit(mag, t, t); }
+        else state = 'idle';
+        return;
+      }
       if (state === 'refractory') {
         if ((t >= until && mag < T * 0.7) || t >= until + 250) state = 'idle'; else return mag;
       }
@@ -191,7 +212,7 @@ function makeDetector(cfg) {
       }
       if (mag > peak) peak = mag;
       var d = x * dir[0] + y * dir[1] + z * dir[2];
-      if (d < -T * 0.6) fire(Math.max(peak, mag), t);
+      if (d < -T * 0.6) fire(Math.max(peak, mag), t, x, y, z, mag);
       else if (t - tStart > 450) state = 'idle';
       return mag;
     },
@@ -233,25 +254,25 @@ function classify(x, ex, k, skip) {
   return { c: +best, d: ds[0].d };
 }
 function loo(ex) {
-  var ok = 0, n = 0, conf = [[0, 0, 0], [0, 0, 0], [0, 0, 0]], i, r;
+  var ok = 0, n = 0, conf = zeros(NT, NT), i, r;
   for (i = 0; i < ex.length; i++) {
-    if (ex[i].c > 2) continue;
+    if (ex[i].c >= NT) continue;
     r = classify(ex[i].f, ex, 3, i); n++;
-    if (r) { if (r.c < 3) conf[ex[i].c][r.c]++; if (r.c === ex[i].c) ok++; }
+    if (r) { if (r.c < NT) conf[ex[i].c][r.c]++; if (r.c === ex[i].c) ok++; }
   }
   return { acc: n ? ok / n : 0, conf: conf };
 }
 // Kendi tipindeki diğer örneklere benzemeyen örnekleri atar (yanlış tetiklenmiş kayıtlar).
 function prune(ex) {
   var keep = [], dropped = 0, c;
-  for (c = 0; c < 3; c++) {
+  for (c = 0; c < NT; c++) {
     var cls = ex.filter(function (e) { return e.c === c; });
     if (cls.length < 5) { keep = keep.concat(cls); continue; }
     var m = cls.map(function (e, i) { var s = 0; cls.forEach(function (o, j) { if (i !== j) s += dist(e.f, o.f); }); return s / (cls.length - 1); });
     var md = med(m);
     cls.forEach(function (e, i) { if (m[i] > 2.2 * md && m[i] > 0.9) dropped++; else keep.push(e); });
   }
-  keep = keep.concat(ex.filter(function (e) { return e.c > 2; }));
+  keep = keep.concat(ex.filter(function (e) { return e.c >= NT; }));   // gard örnekleri olduğu gibi kalır
   return { ex: keep, dropped: dropped };
 }
 // Yumruk numarası (1-6) -> el ve tip. 1 sol direkt, 2 sağ direkt, 3 sol kroşe ...
@@ -261,9 +282,9 @@ function pn(n) { return { h: n % 2 ? 'L' : 'R', ty: Math.floor((n - 1) / 2) }; }
 var $ = function (id) { return document.getElementById(id); };
 var each = function (list, fn) { Array.prototype.forEach.call(list, fn); };
 var PACKS = {
-  davul: { name: 'Davul', L: ['kick', 'snare', 'tom'], R: ['hat', 'clap', 'crash'] },
-  melodi: { name: 'Bas + Melodi', L: ['bass:55', 'bass:65.41', 'bass:82.41'], R: ['pluck:220', 'pluck:261.63', 'pluck:329.63'] },
-  can: { name: 'Çan', L: ['bell:220', 'bell:261.63', 'bell:329.63'], R: ['bell:440', 'bell:523.25', 'bell:659.25'] }
+  davul: { name: 'Davul', L: ['kick', 'snare', 'tom', 'bass:49', 'bass:73.42'], R: ['hat', 'clap', 'crash', 'pluck:146.83', 'pluck:196'] },
+  melodi: { name: 'Bas + Melodi', L: ['bass:55', 'bass:65.41', 'bass:82.41', 'bass:98', 'bass:110'], R: ['pluck:220', 'pluck:261.63', 'pluck:329.63', 'pluck:392', 'pluck:440'] },
+  can: { name: 'Çan', L: ['bell:220', 'bell:261.63', 'bell:329.63', 'bell:196', 'bell:392'], R: ['bell:440', 'bell:523.25', 'bell:659.25', 'bell:392', 'bell:783.99'] }
 };
 var LESSONS = [
   { n: 'Dört direkt', seq: [0, 0, 0, 0] },
@@ -274,7 +295,7 @@ var LESSONS = [
   { n: 'Uzun seri', seq: [0, 0, 1, 2, 1, 0] }
 ];
 var NOTE = { C: 261.63, D: 293.66, E: 329.63, F: 349.23, G: 392 };
-var NUM = ['bir', 'iki', 'üç', 'dört', 'beş', 'altı'];
+var NUM = ['bir', 'iki', 'üç', 'dört', 'beş', 'altı', 'yedi', 'sekiz', 'dokuz', 'on'];
 // Her adım: [yumruk numarası, nota]. Beethoven, Neşeye Övgü (kamu malı).
 var SONGS = [{
   n: 'Neşeye Övgü', by: 'Beethoven', bpm: 84, phrases: [
@@ -288,18 +309,24 @@ var SONGS = [{
     [[3, 'D'], [1, 'C'], [2, 'C']]
   ]
 }];
-var CAL_N = 8, T_N = 10, KEY = 'vurus_v2';
+var CAL_N = 8, T_N = 6, KEY = 'vurus_v2';
 var S = { ex: [], hand: 'R', pack: 'davul', th: 20, rej: 1, bpm: 100, prog: 0, call: true, best: {} };
 try { var saved = JSON.parse(localStorage.getItem(KEY) || 'null'); if (saved) for (var k in saved) S[k] = saved[k]; } catch (e) {}
+// v0.7: beş tip. Eski kayıtta gard sınıfı 3'tü; şimdi NEG. Eski test sonucu ve karışıklık tablosu üç tipliydi, yeniden hesaplanır.
+if (S.sv !== 7) { (S.ex || []).forEach(function (e) { if (e.c === 3) e.c = NEG; }); S.test = null; S.sv = 7; if (S.ex && S.ex.length) { var r0 = loo(S.ex); S.acc = r0.acc; S.conf = r0.conf; } }
 if (!S.best) S.best = {};
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
 
-var cfg = { threshold: S.th, refractory: 160, onHit: onHit };
+var cfg = { threshold: S.th, refractory: 160, onHit: onHit, bag: false };
+// Torba modunda darbe ivmesi yumruk ivmesinden çok küçüktür: eşik ayarın 0,3 katı alınır.
+function applyPlace() { cfg.bag = !!S.bag; cfg.threshold = S.bag ? S.th * 0.3 : S.th; }
+var BAGSONG = [329.63, 329.63, 329.63, 329.63, 329.63, 329.63, 329.63, 392, 261.63, 293.66, 329.63, 349.23, 349.23, 349.23, 349.23, 349.23, 329.63, 329.63, 329.63, 329.63, 329.63, 293.66, 293.66, 329.63, 293.66, 392,
+  329.63, 329.63, 329.63, 329.63, 329.63, 329.63, 329.63, 392, 261.63, 293.66, 329.63, 349.23, 349.23, 349.23, 349.23, 349.23, 329.63, 329.63, 329.63, 329.63, 392, 392, 349.23, 293.66, 261.63], bagPos = 0, bagLast = 0;
 var det = makeDetector(cfg);
-var ctx = null, noise = null, running = false, count = 0, tc = [0, 0, 0], hits = [];
+var ctx = null, noise = null, running = false, count = 0, tc = zeros(NT), hits = [], negAt = -1e9;
 var buf = [], deltas = [], lastT = 0, src = '–', grav = [0, 0, 0], gyro = null;
 var cal = null, les = null, song = null, tst = null, songSeq = 0;
-var VER = 'v0.5', lab = null, neg = null, game = null, hidSeq = 0, recent = [], rejN = 0, lastK = [], stTick = 0;
+var VER = 'v0.7', rec = null, lab = null, neg = null, game = null, hidSeq = 0, recent = [], rejN = 0, lastK = [], stTick = 0;
 var beat = { on: false, next: 0, step: 0, t0: 0 };
 var link = newLink();
 
@@ -313,6 +340,7 @@ function speak(txt) {
 }
 function r3(v) { return Math.round(v * 1000) / 1000; }
 function r2(v) { return Math.round(v * 100) / 100; }
+function r1(v) { return Math.round(v * 10) / 10; }
 function handName(h) { return h === 'L' ? 'Sol' : 'Sağ'; }
 
 /* ---------- ses ---------- */
@@ -387,31 +415,43 @@ function nextBeat() {
 // Bir vuruşun öğretilenlerden hangisine, ne kadar benzediği. Hiçbirine benzemiyorsa "tanınmadı".
 function look(f) {
   if (!S.ex.length) return { c: 0, d: 0, dc: [], known: true };
-  var r = classify(f, S.ex, 3), dc = [9, 9, 9, 9], i, d;
+  var r = classify(f, S.ex, 3), dc = [], i, d; for (i = 0; i <= NEG; i++) dc.push(9);
   for (i = 0; i < S.ex.length; i++) { d = dist(f, S.ex[i].f); if (d < dc[S.ex[i].c]) dc[S.ex[i].c] = d; }
-  return { c: r.c, d: r.d, dc: dc.map(r2), known: r.c < 3 && !(S.rej > 0 && r.d > S.rej) };
+  return { c: r.c, d: r.d, dc: dc.map(r2), known: r.c < NT && !(S.rej > 0 && r.d > S.rej) };
 }
 function onHit(strength, t, tStart) {
+  if (S.bag) {
+    if (rec && t >= rec.t0) rec.e.push([Math.round(t - rec.t0), r1(strength), 0, 0, 1]);
+    handleHit({ c: 0, d: 0, dc: [], known: true }, [], strength, t, ++hidSeq); return;
+  }
   var f = features(buf, tStart, t); if (!f) return;
   if (cal) { calHit(f, t); return; }
   var r = look(f), hid = ++hidSeq;
+  // Gard hareketi tanındıysa aynı hareketin kuyruğu, tanımama sınırı kapalı olsa bile yumruk sayılmaz (geri çekip vurma hâlâ yakalanır: gerçek yumruk örneklere yakındır).
+  if (r.c === NEG) negAt = t; else if (r.known && t - negAt < 450 && r.d > Math.max(S.rej, 1)) r.known = false;
   recent.push({ id: hid, f: f.map(r3) }); if (recent.length > 60) recent.shift();
-  if (lab) { labHit(r, f, t, strength, hid); return; }
+  if (rec && t >= rec.t0) rec.e.push([Math.round(t - rec.t0), Math.round(strength), r.c, r2(r.d), r.known ? 1 : 0]);
+  if (lab) { labHit(r, f, t, strength, hid); return r.known; }
   if (neg) { negHit(r, f, t, strength, hid); return; }
-  if (tst) { testHit(r, f, t); return; }
-  try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {}
+  if (tst) { testHit(r, f, t); return r.known; }
+  if (r.known) { try { if (navigator.vibrate) navigator.vibrate(15); } catch (e) {} }
   handleHit(r, f, strength, t, hid);
+  return r.known;
 }
 // Bu telefonun kendi yumrukları. Ses her zaman bu telefondan, gecikmesiz çıkar.
 function handleHit(r, f, strength, t, hid) {
   var hand = S.hand, type = r.c, g = null, good = null, busy = !!(song || les || game);
-  var vol = Math.max(0.3, Math.min(1, (strength - cfg.threshold) / 50 + 0.3));
+  var vol = Math.max(0.3, Math.min(1, (strength - cfg.threshold) / (S.bag ? 15 : 50) + 0.3));
   count++; lastK.push(r.known ? 1 : 0); if (lastK.length > 10) lastK.shift();
   if (game) { g = gameHit(r, vol, t); good = g ? !!g.ok : null; }
-  else if (!r.known) { rejN++; play('tick', 0.25); mountCheck(); }
+  else if (!r.known) { rejN++; mountCheck(); }
   else {
     tc[type]++; hits.push(Math.round(strength)); if (hits.length > 200) hits.shift();
-    if (song) good = songHit(type, vol);
+    if (S.bag) {   // torba, ekransız: her darbe şarkının sıradaki notası; 4 sn ara verilirse baştan başlar
+      if (t - bagLast > 4000) bagPos = 0;
+      bagLast = t; play('pluck:' + BAGSONG[bagPos % BAGSONG.length], Math.max(0.6, vol)); bagPos++;
+    }
+    else if (song) good = songHit(type, vol);
     else {
       play(PACKS[S.pack][hand][type], vol);
       if (link.ok) tx({ k: 'hit', ty: type, s: Math.round(strength), h: hand });
@@ -419,7 +459,7 @@ function handleHit(r, f, strength, t, hid) {
     }
   }
   sendX(r, strength, t, hid, f, g);
-  var name = !S.ex.length ? 'vuruş' : (game && !g) ? 'boş' : (!game && !r.known) ? 'tanınmadı' : ((link.ok ? handName(hand) + ' ' : '') + TYPES[Math.min(type, 2)].toLowerCase());
+  var name = S.bag ? (game && !g ? 'boş' : 'darbe') : !S.ex.length ? 'vuruş' : (game && !g) ? 'boş' : (!game && !r.known) ? 'tanınmadı' : ((link.ok ? handName(hand) + ' ' : '') + TYPES[Math.min(type, 2)].toLowerCase());
   $('big').textContent = name; $('count').textContent = count;
   $('sub').textContent = 'şiddet ' + Math.round(strength) + ' m/s²';
   if (!busy) { $('lockBig').textContent = name; $('lockSub').textContent = count + ' vuruş'; }
@@ -437,18 +477,19 @@ function stopModes() { if (song) endSong(false); if (les) endLesson(false); if (
 
 /* ---------- öğretme ---------- */
 // only: yalnızca bu tip (yoksa üçü birden). keep: eski örnekler kalsın.
-function calBegin(only, n, keep) {
+function calBegin(only, n, keep, list) {
   if (!running) { say('Önce BAŞLAT\'a bas.'); return; }
   stopModes(); tst = null; lab = null; neg = null;
   if (!keep) { S.ex = []; S.acc = null; S.drop = 0; }
-  cal = { c: only == null ? 0 : only, n: 0, N: n || CAL_N, only: only == null ? null : only, wait: performance.now() + 3500 };
-  speak(TYPES[cal.c] + '. ' + cal.N + ' kez at.'); play('bell:660', 0.5); renderCal();
+  var L = list || (only == null ? TYPES.map(function (x, i) { return i; }) : [only]);
+  cal = { c: L[0], L: L, k: 0, n: 0, N: n || CAL_N, only: only == null && !list ? null : L[0], wait: performance.now() + 3500 };
+  speak(tSay(cal.c) + '. ' + cal.N + ' kez at.'); play('bell:660', 0.5); renderCal();
 }
 function calHit(f, t) {
   if (t < cal.wait) return;
   S.ex.push({ c: cal.c, f: f.map(r3) }); cal.n++; play('tick', 0.6);
   if (cal.n >= cal.N) {
-    if (cal.only == null && cal.c + 1 < TYPES.length) { cal.c++; cal.n = 0; cal.wait = t + 3500; speak(TYPES[cal.c] + '. ' + cal.N + ' kez at.'); play('bell:660', 0.5); }
+    if (cal.k + 1 < cal.L.length) { cal.k++; cal.c = cal.L[cal.k]; cal.n = 0; cal.wait = t + 3500; speak(tSay(cal.c) + '. ' + cal.N + ' kez at.'); play('bell:660', 0.5); }
     else {
       var full = cal.only == null; cal = null;
       if (full) { var p = prune(S.ex); S.ex = p.ex; S.drop = p.dropped; }
@@ -466,16 +507,22 @@ function relearn() {
 function labBegin(c, n, learn) {
   stopModes(); cal = null; tst = null; neg = null;
   lab = { c: c, n: n, got: 0, learn: learn, add: 0, wait: performance.now() + 3000 };
-  speak(TYPES[c] + '. ' + n + ' kez at.'); play('bell:660', 0.5);
-  $('lockBig').textContent = TYPES[c]; $('lockSub').textContent = '0 / ' + n;
+  speak(tSay(c) + '. ' + n + ' kez at.'); play('bell:660', 0.5);
+  $('lockBig').textContent = tLabel(c); $('lockSub').textContent = '0 / ' + n;
 }
 function labHit(r, f, t, strength, hid) {
   if (t < lab.wait) return;
-  var good = r.known && r.c === lab.c; lab.got++;
-  if (!good && lab.learn) { S.ex.push({ c: lab.c, f: f.map(r3) }); lab.add++; }
-  play(good ? 'tick' : 'buzz', 0.6); sendX(r, strength, t, hid, f, null, lab.c);
-  $('lockSub').textContent = lab.got + ' / ' + lab.n;
-  if (lab.got >= lab.n) { lab = null; relearn(); speak('Bitti.'); play('bell:880', 0.6); }
+  var me = lab, commit = function () {
+    var good = r.known && r.c === me.c; me.got++;
+    if (!good && me.learn) { S.ex.push({ c: me.c, f: f.map(r3) }); me.add++; }
+    play(good ? 'tick' : 'buzz', 0.6); sendX(r, strength, t, hid, f, null, me.c);
+    $('lockSub').textContent = me.got + ' / ' + me.n;
+    if (me.got >= me.n && lab === me) { lab = null; relearn(); speak('Bitti.'); play('bell:880', 0.6); }
+  };
+  if (r.known) { me.pend = null; commit(); return; }
+  // Tanınmadı: 500 ms içinde tanınan bir yumruk gelmezse bu gerçekten atılan yumruktur.
+  var p = me.pend = {};
+  setTimeout(function () { if (lab === me && me.pend === p) { me.pend = null; commit(); } }, 500);
 }
 // Gard örnekleri: yumruk atılmadan yapılan hareketlerden ses çıkaranlar "yumruk değil" olarak öğrenilir.
 function negBegin(secs) {
@@ -492,21 +539,23 @@ function negBegin(secs) {
 }
 function negHit(r, f, t, strength, hid) {
   if (t < neg.wait) return;
-  if (r.known && neg.add < 12) { S.ex.push({ c: 3, f: f.map(r3) }); neg.add++; play('buzz', 0.4); }
+  if (r.known && neg.add < 12) { S.ex.push({ c: NEG, f: f.map(r3) }); neg.add++; play('buzz', 0.4); }
   sendX(r, strength, t, hid, f, null, 3);
 }
 function renderCal() {
-  var n = [0, 0, 0, 0]; S.ex.forEach(function (e) { n[e.c]++; });
+  var n = zeros(NT + 1); S.ex.forEach(function (e) { n[e.c]++; });
   $('calStatus').innerHTML = TYPES.map(function (name, i) {
     var cur = cal && cal.c === i;
     return '<div class="row" style="justify-content:space-between;padding:4px 0' + (cur ? ';color:var(--hit);font-weight:700' : '') + '"><span>' +
-      name + (cur ? ' ← şimdi bunu at' : '') + '</span><span>' + n[i] + ' örnek</span></div>';
-  }).join('') + (n[3] ? '<div class="row" style="justify-content:space-between;padding:4px 0;color:var(--dim)"><span>Gard (yumruk değil)</span><span>' + n[3] + ' örnek</span></div>' : '');
+      tLabel(i) + (cur ? ' ← şimdi bunu at' : '') + '</span><span>' + n[i] + ' örnek</span></div>';
+  }).join('') + (n[NEG] ? '<div class="row" style="justify-content:space-between;padding:4px 0;color:var(--dim)"><span>Gard (yumruk değil)</span><span>' + n[NEG] + ' örnek</span></div>' : '');
+  var miss = []; TYPES.forEach(function (x, i) { if (!n[i]) miss.push(i); });
+  $('calMore').style.display = !cal && S.ex.length && miss.length && miss.length < NT ? 'block' : 'none'; $('calMore').textContent = 'Eksik yumrukları öğret (' + miss.map(pnum).join(', ') + ')';
   $('calStart').textContent = cal ? 'Öğretiliyor…' : (S.ex.length ? 'Yeniden öğret' : 'Öğretmeye başla');
   $('calStart').disabled = !!cal;
   var txt = '';
   if (!cal && S.ex.length && S.acc != null) {
-    txt = 'Ayırt etme başarısı: %' + Math.round(S.acc * 100) + ' (' + (n[0] + n[1] + n[2]) + ' örnek, kendi kendini sınama).';
+    txt = 'Ayırt etme başarısı: %' + Math.round(S.acc * 100) + ' (' + (S.ex.length - n[NEG]) + ' örnek, kendi kendini sınama).';
     if (S.drop) txt += ' ' + S.drop + ' aykırı örnek atıldı.';
     var worst = 0, pair = null;
     if (S.conf) S.conf.forEach(function (row, i) { row.forEach(function (v, j) { if (i !== j && v > worst) { worst = v; pair = [i, j]; } }); });
@@ -514,7 +563,7 @@ function renderCal() {
     txt += ' Gerçek başarı için Veri sekmesindeki doğrulama testini yap.';
   }
   $('calResult').textContent = txt;
-  if (cal) { $('lockBig').textContent = TYPES[cal.c]; $('lockSub').textContent = cal.n + ' / ' + cal.N; }
+  if (cal) { $('lockBig').textContent = tLabel(cal.c); $('lockSub').textContent = cal.n + ' / ' + cal.N; }
   $('hint').textContent = S.ex.length ? '' : 'Şu an her yumruk aynı sesi çalar. Üç ayrı ses için Öğret sekmesinden yumruklarını öğret.';
 }
 
@@ -524,19 +573,21 @@ function testBegin() {
   if (!S.ex.length) { say('Test için önce Öğret sekmesinden yumruklarını öğret.'); return; }
   say(''); stopModes(); cal = null;
   lab = null; neg = null;
-  tst = { st: 0, n: 0, wait: performance.now() + 3500, conf: [[0, 0, 0], [0, 0, 0], [0, 0, 0]], fa: 0, far: 0, rej: [0, 0, 0], miss: [] };
-  speak(TYPES[0] + '. On kez at.'); play('bell:660', 0.5); renderTest();
+  var cnt = zeros(NT + 1), tl = [], i; S.ex.forEach(function (e) { cnt[e.c]++; }); for (i = 0; i < NT; i++) if (cnt[i]) tl.push(i);   // yalnızca öğretilmiş yumruklar sınanır
+  if (!tl.length) { say('Test için önce yumruklarını öğret.'); return; }
+  tst = { st: tl[0], k: 0, L: tl, n: 0, wait: performance.now() + 3500, conf: zeros(NT, NT), fa: 0, far: 0, rej: zeros(NT), miss: [] };
+  speak(tSay(tst.st) + '. ' + T_N + ' kez at.'); play('bell:660', 0.5); renderTest();
 }
 function testHit(r, f, t) {
   if (t < tst.wait) return;
-  if (tst.st >= 3) { if (r.known) { tst.fa++; play('buzz', 0.4); } else tst.far++; renderTest(); return; }
-  if (!r.known) { tst.rej[tst.st]++; play('tom', 0.4); if (tst.miss.length < 12) tst.miss.push([tst.st, -1].concat(f.map(r2))); renderTest(); return; }
+  if (tst.st >= NT) { if (r.known) { tst.fa++; play('buzz', 0.4); } else tst.far++; renderTest(); return; }
+  if (!r.known) { tst.rej[tst.st]++; if (tst.miss.length < 12) tst.miss.push([tst.st, -1].concat(f.map(r2))); renderTest(); return; }
   var type = r.c;
   tst.conf[tst.st][type]++; tst.n++; play('tick', 0.6);
   if (type !== tst.st && tst.miss.length < 12) tst.miss.push([tst.st, type].concat(f.map(r2)));
   if (tst.n >= T_N) {
-    tst.st++; tst.n = 0; tst.wait = t + 3500;
-    if (tst.st < 3) { speak(TYPES[tst.st] + '. On kez at.'); play('bell:660', 0.5); }
+    tst.k++; tst.st = tst.k < tst.L.length ? tst.L[tst.k] : NT; tst.n = 0; tst.wait = t + 3500;
+    if (tst.st < NT) { speak(tSay(tst.st) + '. ' + T_N + ' kez at.'); play('bell:660', 0.5); }
     else {
       speak('Gard. Yirmi saniye yumruk atmadan hareket et.'); play('bell:660', 0.5);
       var me = tst; setTimeout(function () { if (tst === me) testEnd(); }, 23500);
@@ -554,14 +605,14 @@ function renderTest() {
   $('testBtn').disabled = !!tst;
   if (t) {
     html = TYPES.map(function (name, i) {
-      var row = t.conf[i], tot = row[0] + row[1] + row[2];
-      return '<div class="row" style="justify-content:space-between;padding:3px 0"><span>' + name +
-        (tst && tst.st === i ? ' ← şimdi' : '') + '</span><span>' + row[i] + ' / ' + tot + ' doğru' + (t.rej && t.rej[i] ? ', ' + t.rej[i] + ' tanınmadı' : '') + '</span></div>';
+      var row = t.conf[i] || [], tot = row.reduce(function (a, b) { return a + b; }, 0); if (!tot && !(tst && tst.st === i)) return '';
+      return '<div class="row" style="justify-content:space-between;padding:3px 0"><span>' + tLabel(i) +
+        (tst && tst.st === i ? ' ← şimdi' : '') + '</span><span>' + (row[i] || 0) + ' / ' + tot + ' doğru' + (t.rej && t.rej[i] ? ', ' + t.rej[i] + ' tanınmadı' : '') + '</span></div>';
     }).join('') + '<div class="row" style="justify-content:space-between;padding:3px 0"><span>Gardda yanlış ses' +
-      (tst && tst.st === 3 ? ' ← şimdi, yumruk atma' : '') + '</span><span>' + t.fa + '</span></div>';
+      (tst && tst.st === NT ? ' ← şimdi, yumruk atma' : '') + '</span><span>' + t.fa + '</span></div>';
   }
   $('testRes').innerHTML = html;
-  if (tst) { $('lockBig').textContent = tst.st < 3 ? TYPES[tst.st] : 'Gard'; $('lockSub').textContent = tst.st < 3 ? tst.n + ' / ' + T_N : 'yumruk atma'; }
+  if (tst) { $('lockBig').textContent = tst.st < NT ? tLabel(tst.st) : 'Gard'; $('lockSub').textContent = tst.st < NT ? tst.n + ' / ' + T_N : 'yumruk atma'; }
 }
 
 /* ---------- şarkı ---------- */
@@ -814,30 +865,34 @@ function sendX(r, strength, t, hid, f, g, tr) {
 }
 function sendStatus() {
   if (!scrOn()) return;
-  var n = [0, 0, 0, 0]; S.ex.forEach(function (e) { n[e.c]++; });
-  txs({ k: 'st', v: VER, run: running ? 1 : 0, n: n, acc: S.acc == null ? null : Math.round(S.acc * 100), th: S.th, rej: S.rej,
+  var n = zeros(NT + 1); S.ex.forEach(function (e) { n[e.c]++; });
+  txs({ k: 'st', v: VER, bag: S.bag ? 1 : 0, run: running ? 1 : 0, n: n, acc: S.acc == null ? null : Math.round(S.acc * 100), th: S.th, rej: S.rej,
     test: S.test ? { conf: S.test.conf, fa: S.test.fa, rej: S.test.rej || null } : null, int: med(deltas), cnt: count, rejN: rejN,
-    busy: cal ? 'öğretme ' + TYPES[cal.c] + ' ' + cal.n + '/' + cal.N : tst ? 'test' : lab ? 'seri' : neg ? 'gard' : game ? 'oyun' : song ? 'şarkı' : '' });
+    busy: rec ? 'kayıt' : cal ? 'öğretme ' + TYPES[cal.c] + ' ' + cal.n + '/' + cal.N : tst ? 'test' : lab ? 'seri' : neg ? 'gard' : game ? 'oyun' : song ? 'şarkı' : '' });
 }
 function onScreen(d) {
   var was = scrOn(); link.scr = performance.now();
-  if (d.k === 'sp') { txs({ k: 'sq', t: d.t, w: performance.now() }); if (!was) { sendStatus(); renderLink(); } }
+  if (d.k === 'sp') {
+    txs({ k: 'sq', t: d.t, w: performance.now() });
+    if (!was) { sendStatus(); renderLink(); $('lockBig').textContent = handName(S.hand) + ' el'; $('lockSub').textContent = 'sensör modu · ekran bağlı'; $('lock').classList.add('show'); }
+  }
   else if (d.k === 'gs') gameStart(d);
   else if (d.k === 'ge') { if (game && game.id === d.id) gameStop(); }
   else if (d.k === 'cmd' && (d.to === '*' || d.to === link.me)) doCmd(d);
 }
 function doCmd(d) {
-  var c = d.c, msg = '', needs = { teach: 1, test: 1, label: 1, neg: 1 };
+  var c = d.c, msg = '', needs = { teach: 1, test: 1, label: 1, neg: 1, rec: 1 };
   if (needs[c] && !running) msg = 'telefonda BAŞLAT\'a basılmamış';
   else if ((c === 'test' || c === 'label') && !S.ex.length) msg = 'önce yumruklar öğretilmeli';
   else if (c === 'teach') calBegin(d.ty, d.n, d.keep);
   else if (c === 'test') testBegin();
   else if (c === 'label') labBegin(d.ty, d.n || 10, !!d.learn);
   else if (c === 'neg') negBegin(d.secs || 20);
+  else if (c === 'rec') recBegin(d);
   else if (c === 'th') { setTh(Math.max(8, Math.min(60, d.v))); save(); }
   else if (c === 'rej') { setRej(Math.max(0, Math.min(2, d.v))); save(); }
   else if (c === 'prune') { var p = prune(S.ex); S.ex = p.ex; S.drop = (S.drop || 0) + p.dropped; relearn(); msg = p.dropped + ' aykırı örnek atıldı'; }
-  else if (c === 'clrneg') { S.ex = S.ex.filter(function (e) { return e.c < 3; }); relearn(); }
+  else if (c === 'clrneg') { S.ex = S.ex.filter(function (e) { return e.c < NT; }); relearn(); }
   else if (c === 'fix') {
     var h = recent.filter(function (x) { return x.id === d.hid; })[0];
     if (h) { S.ex.push({ c: d.ty, f: h.f }); relearn(); msg = 'örnek eklendi'; } else msg = 'vuruş artık bellekte değil';
@@ -845,6 +900,22 @@ function doCmd(d) {
   else if (c === 'stop') { stopModes(); cal = null; tst = null; lab = null; neg = null; renderCal(); renderTest(); }
   else if (c === 'rep') txs({ k: 'rep', txt: reportText() });
   txs({ k: 'ack', c: c, msg: msg }); sendStatus();
+}
+// Ham kayıt: modeli gerçek hareketle geliştirmek için sensör akışı ve dedektörün kararları ekrana gönderilir.
+function recBegin(d) {
+  stopModes(); cal = null; tst = null; lab = null; neg = null;
+  var me = rec = { id: d.id, label: d.label, secs: d.secs, t0: performance.now() + 3500, s: [], e: [] };
+  speak(d.say + '. ' + d.secs + ' saniye.'); play('bell:660', 0.5);
+  $('lockBig').textContent = 'Kayıt'; $('lockSub').textContent = d.say;
+  setTimeout(function () {
+    if (rec !== me) return;
+    rec = null; play('bell:880', 0.6); speak('Kayıt bitti.'); $('lockBig').textContent = '–'; $('lockSub').textContent = '';
+    var n = zeros(NT + 1), parts = [], i; S.ex.forEach(function (e) { n[e.c]++; });
+    for (i = 0; i < me.s.length; i += 120) parts.push(me.s.slice(i, i + 120));
+    txs({ k: 'rc', id: me.id, part: -1, of: parts.length, meta: { label: me.label, secs: me.secs, ver: VER, th: S.th, rej: S.rej, n: n, int: med(deltas), src: src, ua: navigator.userAgent.replace(/^.*?\((.*?)\).*$/, '$1') }, e: me.e });
+    parts.forEach(function (p, k) { setTimeout(function () { txs({ k: 'rc', id: me.id, part: k, s: p }); }, 120 * (k + 1)); });
+    sendStatus();
+  }, 3500 + d.secs * 1000);
 }
 // Oyun: notaları ve başlangıç anını ekran verir; zamanlamayı ve sesi bu telefon kendi saatinde, yerinde çözer.
 function gameStart(d) {
@@ -864,9 +935,9 @@ function gameHit(r, vol, t) {
     dt = t - (game.t0 + n.t);
     if (Math.abs(dt) <= 260 && (!best || Math.abs(dt) < Math.abs(bd))) { best = n; bd = dt; }
   }
-  if (!best || r.c > 2) { play('tick', 0.2); return null; }
+  if (!best || !r.known) return null;
   best.done = true;
-  var ok = r.c === best.ty;
+  var ok = !!S.bag || r.c === best.ty;
   if (ok) play('pluck:' + best.fq, Math.max(0.6, vol)); else play('buzz', 0.5);
   return { i: best.i, dt: Math.round(bd), ok: ok ? 1 : 0 };
 }
@@ -904,6 +975,7 @@ function onMotion(e) {
   var hasR = rr && rr.alpha !== null && rr.alpha !== undefined;
   gyro = hasR; var R = hasR ? [rr.alpha, rr.beta, rr.gamma] : [0, 0, 0];
   buf.push({ t: t, a: A, g: G, r: R }); if (buf.length > 45) buf.shift();
+  if (rec && t >= rec.t0) rec.s.push([Math.round(t - rec.t0), r1(A[0]), r1(A[1]), r1(A[2]), r1(G[0]), r1(G[1]), r1(G[2]), Math.round(R[0]), Math.round(R[1]), Math.round(R[2])]);
   if (lastT) { deltas.push(t - lastT); if (deltas.length > 120) deltas.shift(); }
   lastT = t;
   var mag = det.sample(A[0], A[1], A[2], t);
@@ -927,11 +999,14 @@ document.addEventListener('visibilitychange', function () {
 function begin() {
   window.addEventListener('devicemotion', onMotion);
   running = true; lastT = 0; keepAwake();
-  $('start').textContent = 'Çalışıyor'; $('start').classList.add('on');
+  $('start').textContent = 'Çalışıyor · durdurmak için bas'; $('start').classList.add('on');
   $('sub').textContent = 'hazır, vur'; say(''); play(PACKS[S.pack][S.hand][0], 0.6);
 }
 $('start').addEventListener('click', function () {
-  if (running) return;
+  if (running) {
+    window.removeEventListener('devicemotion', onMotion); running = false; stopModes(); cal = null; tst = null; lab = null; neg = null; setBeat(false);
+    $('start').textContent = 'BAŞLAT'; $('start').classList.remove('on'); $('sub').textContent = 'durduruldu'; renderCal(); renderTest(); sendStatus(); return;
+  }
   if (!window.isSecureContext) { say('Bu sayfa https adresinden açılmalı; sensöre bu şekilde erişilemiyor.'); return; }
   if (typeof DeviceMotionEvent === 'undefined') { say('Bu tarayıcı hareket sensörünü desteklemiyor. iPhone\'da Safari, Android\'de Chrome kullan.'); return; }
   var p = Promise.resolve('granted');
@@ -966,7 +1041,7 @@ each($('hands').children, function (b) {
     if (link.ok) { hello(true); renderLink(); }
   });
 });
-function setTh(v) { S.th = v; cfg.threshold = v; $('th').value = v; $('thv').textContent = v; $('tick').style.left = Math.min(100, v / 60 * 100) + '%'; }
+function setTh(v) { S.th = v; cfg.threshold = S.bag ? v * 0.3 : v; $('th').value = v; $('thv').textContent = v; $('tick').style.left = Math.min(100, v / 60 * 100) + '%'; }
 $('th').addEventListener('input', function () { setTh(+this.value); save(); });
 function setBpm(v) { S.bpm = v; $('bpm').value = v; $('bpmv').textContent = v + ' BPM'; }
 $('bpm').addEventListener('input', function () { setBpm(+this.value); save(); if (beat.on && !song) setBeat(true); });
@@ -975,6 +1050,13 @@ $('beatBtn').addEventListener('click', function () {
   if (!song) setBeat(!beat.on);
 });
 $('calStart').addEventListener('click', function () { calBegin(); });
+$('calMore').addEventListener('click', function () { var n = zeros(NT + 1), miss = []; S.ex.forEach(function (e) { n[e.c]++; }); TYPES.forEach(function (x, i) { if (!n[i]) miss.push(i); }); if (miss.length) calBegin(null, null, true, miss); });
+function setPlace(v) {
+  S.bag = v ? 1 : 0; applyPlace(); bagPos = 0;
+  each($('places').children, function (b) { b.classList.toggle('sel', +b.getAttribute('data-v') === S.bag); });
+  $('bagNote').style.display = S.bag ? 'block' : 'none'; sendStatus();
+}
+each($('places').children, function (b) { b.addEventListener('click', function () { stopModes(); setPlace(+b.getAttribute('data-v')); save(); }); });
 each($('addRow').children, function (b) { b.addEventListener('click', function () { calBegin(+b.getAttribute('data-c'), 5, true); }); });
 $('negBtn').addEventListener('click', function () { negBegin(20); });
 function setRej(v) { S.rej = v; $('rj').value = v; $('rjv').textContent = v > 0 ? v.toFixed(1) : 'kapalı'; }
@@ -991,8 +1073,8 @@ $('joinGo').addEventListener('click', function () { linkStart('join', $('code').
 $('linkOff').addEventListener('click', linkClose);
 function reportText() {
   var s = stats(), f = function (v) { return v === null ? '?' : v.toFixed(1); }, J = JSON.stringify, T = S.test;
-  var n = [0, 0, 0, 0]; S.ex.forEach(function (e) { n[e.c]++; });
-  return 'Vuruş v0.5 raporu\n' +
+  var n = zeros(NT + 1); S.ex.forEach(function (e) { n[e.c]++; });
+  return 'Vuruş v0.7 raporu\n' +
     'cihaz: ' + navigator.userAgent.replace(/^.*?\((.*?)\).*$/, '$1') + '\n' +
     'el: ' + S.hand + ' | paket: ' + S.pack + ' | eşik: ' + S.th + ' | tanımama sınırı: ' + S.rej + '\n' +
     'sensör aralığı: ' + f(s.int) + ' ms | ses çıkışı: ' + f(s.out) + ' ms | jiroskop: ' + (gyro ? 'var' : 'yok') + ' | kaynak: ' + src + '\n' +
@@ -1026,7 +1108,7 @@ if (!S.v5) {
   if (S.ex.length) { var p0 = prune(S.ex); S.ex = p0.ex; S.drop = (S.drop || 0) + p0.dropped; var l0 = loo(S.ex); S.acc = l0.acc; S.conf = l0.conf; }
   S.v5 = 1; save();
 }
-setTh(S.th); setRej(S.rej); setBpm(S.bpm); renderChoices(); renderCal(); renderTest(); renderSong(); renderLessons(); renderLink();
+setPlace(S.bag); setTh(S.th); setRej(S.rej); setBpm(S.bpm); renderChoices(); renderCal(); renderTest(); renderSong(); renderLessons(); renderLink();
 </script>
 </body>
 </html>
