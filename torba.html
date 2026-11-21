@@ -46,7 +46,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 </head>
 <body>
 <div class="scr on" id="home">
-  <h1>Vuruş</h1><small class="v">Torba · v1.2.3</small>
+  <h1>Vuruş</h1><small class="v">Torba · v1.2.4</small>
   <p style="margin-top:16px"><b>Torbaya vur, şarkıyı sen çal.</b> Her vuruş melodinin bir notası; ne kadar sert vurursan o kadar güçlü çalar.</p>
   <div class="box"><b>Kurulum</b><p>1. Telefonu torbanın <b>en üst kısmına</b>, vuruş bölgesinin dışına, ekranı sana bakacak şekilde <b>sıkıca</b> bağla. Torbanın en az sallanan yeri üstüdür. Gevşek kayış yanlış sayar.<br>2. Sesi sonuna kadar aç, sessiz modu kapat.<br>3. BAŞLA'ya bas, sensör iznini ver.</p></div>
   <button id="start" class="big primary">BAŞLA</button>
@@ -120,7 +120,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 <script>
 'use strict';
 var $ = function (id) { return document.getElementById(id); };
-var VER = 'torba-1.2.3', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
+var VER = 'torba-1.2.4', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
 function pn(n) { return { h: n % 2 ? 'L' : 'R', ty: Math.floor((n - 1) / 2) }; }
 function med(a) { if (!a.length) return 0; var s = a.slice().sort(function (p, q) { return p - q; }); return s[Math.floor(s.length / 2)]; }
 function r1(v) { return Math.round(v * 10) / 10; }
@@ -624,11 +624,11 @@ function sessText(all) {   // all: daha önce kopyalananlar dahil saklanan büt�
    Güç sesin büyüklüğünü seçer: hafif = nota, orta = nota + akor, sert = nota + akor + bas davul ve zil.
    Tempo oyuncunundur: dört düzenli vuruştan (ya da iki kez tekrarlanan bir kombodan) sonra davul-bas eşliği o hıza kilitlenir ve her vuruşta yeniden hizalanır.
    Enerji çubuğunu güç ve sıklık doldurur; dolunca dokuz saniye tam kadro çalar, durunca müzik söner. */
-var BURST = 9000;
-function enNew() { return { e: 0, at: performance.now(), bEnd: 0, bursts: 0, on: false, P: 0, anchor: 0, k: 1, sub: 0, emit: -1, T: [], grid: 0, q: 0, bad: 0, drop: false, cand: 0, last: 0, locks: 0, score: 0, tiers: [0, 0, 0] }; }
+var BURST = 10000;
+function enNew() { return { e: 0, at: performance.now(), bEnd: 0, bursts: 0, on: false, P: 0, anchor: 0, k: 1, sub: 0, emit: -1, T: [], grid: 0, q: 0, bad: 0, drop: false, cand: 0, last: 0, locks: 0, score: 0, tiers: [0, 0, 0], cmb: 0, pl: 0 }; }
 function enDecay(en, now) {
   var dt = Math.max(0, now - en.at) / 1000; en.at = now;
-  if (now < en.bEnd && now - en.last <= 2500) { en.e = 0.2 + 0.8 * (en.bEnd - now) / BURST; return; }
+  if (now < en.bEnd && (now - en.last <= 2500 || (game && game.bgm))) { en.e = 0.2 + 0.8 * (en.bEnd - now) / BURST; return; }
   if (en.bEnd) { en.bEnd = 0; en.e = Math.min(en.e, 0.2); }   // süre doldu ya da oyuncu durdu
   en.e = Math.max(0, en.e - dt * (0.04 + (en.last && now - en.last > 1500 ? 0.3 : 0)));
 }
@@ -714,14 +714,39 @@ setInterval(bandTick, 20);
 function layer(n, from, to, burst, v) {
   if (from <= 1 && (to >= 1 || burst)) play('chord:' + n.rt * 2, 0.22 + 0.2 * v, 0, bg);
   if (from <= 1 && burst) { if (n.fq) play('pluck:' + n.fq * 2, 0.3 * v, 0, bg); else play('hat', 0.3, 0, bg); }
-  if (from <= 2 && to >= 2) { fx('boom', 0.75); duck(); }
+  if (from <= 2 && to >= 2) fx('boom', 0.75);
 }
 function bgSet(v) {   // müzik yolunun sesi; planlanmış geri çekilmeyi de siler
   if (!bg) return; try { bg.gain.cancelScheduledValues(ac.currentTime); bg.gain.setValueAtTime(v, ac.currentTime); } catch (e) {} bg.gain.value = v;
 }
-function duck() {   // raundda sert vuruşta müzik bir an geri çekilir: vuruş öne çıkar, toplam ses taşmaz
+function rdVol(g) { return g.rd.ph !== 'work' ? 0.3 : g.lv === 3 ? 0.9 : 0.7; }   // müzik yolunun olması gereken sesi
+function duck(tier) {   // her yumrukta müzik bir an geri çekilir (sertte daha çok): yumruk öne çıkar, müzik onunla "nefes alır"
   if (!bg || !game || !game.bgm) return;
-  var t = ac.currentTime; try { bg.gain.cancelScheduledValues(t); bg.gain.setValueAtTime(0.55, t); bg.gain.linearRampToValueAtTime(0.85, t + 0.16); } catch (e) {}
+  var t = ac.currentTime, v = rdVol(game); try { bg.gain.cancelScheduledValues(t); bg.gain.setValueAtTime(v * [0.72, 0.58, 0.45][tier], t); bg.gain.linearRampToValueAtTime(v, t + 0.17); } catch (e) {}
+}
+/* ---------- raundda yumruğun sesi ----------
+   Her yumruk müziğin üstünde net duyulur ve müzik yolundan değil doğrudan çıkışa gider:
+   parlak bir "şak" + şarkının o anki akorundan parlak bir nota. Seri sürdükçe nota tırmanır (kök, beşli, oktav, üst beşli, iki oktav; sonra tepede gidip gelir),
+   0,9 saniye ara verince başa döner. Ses gücü vuruşun şiddetiyle büyür; ortada akor, sertte bas davul + zil eklenir; patlamada her yumruk zilli çalar. */
+var PST = [1, 1.5, 2, 3, 4];
+function punchSnd(g, h, from, to, v, burst) {
+  var t = ac.currentTime, o = ac.createGain(), en = g.en, f = bgRoot(g, h.t) * 4, k, s16, pos, tq;
+  if (f > 600) f /= 2;
+  o.connect(mst);
+  if (from === 0) {
+    // "Şak" anında çalar (darbe hissi). Nota müziğin on altılık ızgarasına oturur: en çok ~0,1 sn sonra, böylece ritim dışı vuruş bile müzikle uyumlu duyulur.
+    s16 = g.bgm.q / 4; pos = (t - g.a0) / s16; h.tq = pos < 0 || pos - Math.floor(pos) < 0.2 ? t : g.a0 + Math.ceil(pos) * s16;
+    en.cmb = h.t - en.pl < 900 ? en.cmb + 1 : 0; en.pl = h.t;
+    k = en.cmb < 5 ? en.cmb : 3 + en.cmb % 2; h.pf = f * PST[k]; h.pv = (0.42 + 0.58 * v) * (burst ? 1.1 : 1);
+    o.gain.value = h.pv;
+    nz(2200, 0.1, 0.6, t, o); tone('triangle', 240, 110, 0.1, 0.5, t, o);
+    tone('sawtooth', h.pf, 0, 0.24, 0.3, h.tq, o); tone('square', h.pf * 2, 0, 0.16, 0.1, h.tq, o); tone('triangle', h.pf, 0, 0.3, 0.3, h.tq, o);
+    if (burst) nz(5200, 0.4, 0.3, t, o);
+  } else o.gain.value = 0.5 + 0.5 * v;
+  tq = Math.max(t, h.tq || 0);
+  if (from <= 1 && to >= 1) { tone('triangle', f, 0, 0.5, 0.26, tq, o); tone('triangle', f * 1.5, 0, 0.45, 0.2, tq, o); tone('sawtooth', f / 2, 0, 0.4, 0.16, tq, o); }
+  if (from <= 2 && to >= 2) { fx('boom', 0.8); nz(5200, 0.5, 0.45, t, o); tone('sawtooth', (h.pf || f) * 2, 0, 0.3, 0.14, tq, o); }
+  duck(to);
 }
 function burstGo(g, now) {
   var en = g.en; en.e = 1; en.bEnd = now + BURST; en.bursts++; S.dBurst = (S.dBurst || 0) + 1;
@@ -734,12 +759,11 @@ function enHit(g, h) {
   g.n++; g.hl.push(h); meter = { s: h.s0 * S.hard / S.hp, at: now };
   t0 = h.s0 >= S.pwi ? 2 : h.s0 >= S.lp + 0.5 * (S.pwi - S.lp) ? 1 : 0; h.tier = t0;
   // Arkada müzik çalarken (raund) vuruş melodi çalmaz: davul vurur, sertleştikçe o anki akor ve bas davul eklenir.
-  if (g.bgm) fx('tom', 0.5 + 0.5 * v); else play('pluck:' + n.fq, v, 0, bg);
-  layer(n, 1, t0, burst, v);
+  if (g.bgm) punchSnd(g, h, 0, t0, v, burst); else { play('pluck:' + n.fq, v, 0, bg); layer(n, 1, t0, burst, v); }
   if (g.bgm) en.last = now; else bandHit(en, now);   // raundda tempo şarkınındır; son vuruş anı patlamanın sürmesi ve durunca sönme için tutulur
   if (!burst) {
     rel = Math.max(0, Math.min(1, (h.s0 - S.thr) / Math.max(1, S.hp - S.thr)));
-    en.e = Math.min(1, en.e + 0.02 + 0.05 * rel);
+    en.e = Math.min(1, en.e + (g.bgm ? 0.03 + 0.06 * rel : 0.02 + 0.05 * rel));   // raundda çubuk biraz daha çabuk dolar
     if (en.e >= 1) burstGo(g, now);
   }
   en.score += (10 + 10 * t0) * (burst ? 2 : 1);
@@ -749,7 +773,8 @@ function enHit(g, h) {
     meter.s = h.s;
     var t1 = h.s >= S.pw ? 2 : h.s >= S.light + 0.5 * (S.pw - S.light) ? 1 : 0, at = performance.now();
     if (t1 > h.tier) {
-      layer(n, h.tier + 1, t1, at < en.bEnd, v); en.score += 10 * (t1 - h.tier);
+      if (g.bgm) punchSnd(g, h, h.tier + 1, t1, v, at < en.bEnd); else layer(n, h.tier + 1, t1, at < en.bEnd, v);
+      en.score += 10 * (t1 - h.tier);
       if (t1 === 2) { g.pop = { k: 'pow', at: at }; g.fx.push({ st: 'perfect', at: at, pow: true }); }
       h.tier = t1;
     }
@@ -779,7 +804,7 @@ function bells(k) { for (var i = 0; i < k; i++) play('bell:988', 0.7, ac.current
 /* ---------- raund düzenlemesi ----------
    Şarkı kendi temposundan raund temposuna çekilir (seviyeye göre 116 / 126 / 136 vuruş/dk) ve dört kat halinde kurulur:
    0 temel (her zaman): davul, bas, melodi · 1 vurdukça: her vuruşta bas davul + bas yürüyüşü · 2 enerji yükselince ve son on saniyede: on altılık zil + akor vuruşları
-   3 patlamada: melodi bir oktav üstten ikilenir + zil. Temel kat 1,6 sn önceden, üst katlar 0,2 sn önceden planlanır; böylece müzik vuruşa hemen cevap verir. */
+   3 patlamada (on saniye): çift tempo bas davul, her ölçüde zil, melodi bir oktav üstten ikilenir. Temel kat 1,6 sn önceden, üst katlar 0,2 sn önceden planlanır; böylece müzik vuruşa hemen cevap verir. */
 var RBPM = [116, 126, 136], RLV = ['Vur, müzik büyüsün', 'Ritim açıldı', 'Tam gaz', 'PATLAMA'];
 function rdChart(i, lvl, secs) {
   var ch = SONGS[i].build(lvl), G = ch.grid.map(function (x) { return x[0]; }), q = 60 / RBPM[lvl], nb = G.length / 2, ev = [], xv = [], N, B, k, b, o, rt, loops;
@@ -799,13 +824,14 @@ function rdChart(i, lvl, secs) {
       xv.push([(o + b + 0.5) * q, 'bass:' + root(b + 0.5), 0.26, 1]);
       xv.push([(o + b + 0.25) * q, 'hat', 0.07, 2], [(o + b + 0.75) * q, 'hat', 0.07, 2]);
       if (b % 2) xv.push([(o + b + 0.5) * q, 'chord:' + rt * 2, 0.15, 2]);
-      if (b % 8 === 0) xv.push([(o + b) * q, 'crash', 0.22, 3]);
+      xv.push([(o + b + 0.5) * q, 'kick', 0.42, 3]);
+      if (b % 4 === 0) xv.push([(o + b) * q, 'crash', 0.22, 3]);
     }
     B.forEach(function (x) { ev.push([(o + x[0]) * q, 'bass:' + x[1], 0.4]); });
-    N.forEach(function (x) { ev.push([(o + x[0]) * q, 'pluck:' + x[1], 0.32]); xv.push([(o + x[0]) * q, 'pluck:' + x[1] * 2, 0.17, 3]); });
+    N.forEach(function (x) { ev.push([(o + x[0]) * q, 'pluck:' + x[1], 0.32]); xv.push([(o + x[0]) * q, 'pluck:' + x[1] * 2, 0.24, 3]); });
   }
   ev.sort(function (a, c) { return a[0] - c[0]; }); xv.sort(function (a, c) { return a[0] - c[0]; });
-  return { ev: ev, xv: xv, len: nb * q * 1000, bass: B.map(function (x) { return [x[0] * q * 1000, x[1]]; }), bpm: RBPM[lvl] };
+  return { ev: ev, xv: xv, len: nb * q * 1000, bass: B.map(function (x) { return [x[0] * q * 1000, x[1]]; }), bpm: RBPM[lvl], q: q };
 }
 function rdLv(g, now) {   // müziğin o anki katı
   var r = g.rd, en = g.en, k = 0, i, lv;
@@ -816,7 +842,7 @@ function rdLv(g, now) {   // müziğin o anki katı
 }
 function rdSched() {   // üst katlar: son anda, o anki kata göre
   var g = game, t = ac.currentTime, lim = t + 0.22, e;
-  g.lv = rdLv(g, performance.now());
+  g.lv = rdLv(g, performance.now()); e = rdVol(g); if (e !== g.bv) { g.bv = e; bgSet(e); }
   while (g.xi < g.xv.length && g.a0 + g.xv[g.xi][0] < lim) { e = g.xv[g.xi++]; if (e[3] <= g.lv && g.a0 + e[0] >= t - 0.03) play(e[1], e[2], g.a0 + e[0], bg); }
 }
 function startRound() {
@@ -826,7 +852,7 @@ function startRound() {
   newBus(); mode = 'round'; hud('Raund 1 / ' + S.rd.n); lastStart = startRound;
   // Arkada sürekli müzik: seçili şarkı raund temposunda döner; vurdukça katman açılır (rdChart, rdLv, rdSched).
   var A = rdChart(S.i, S.lvl, S.rd.n * (S.rd.w + S.rd.r) + 2);
-  game.ev = A.ev; game.ei = 0; game.xv = A.xv; game.xi = 0; game.lv = 0; game.a0 = ac.currentTime + 5; game.bgm = { t0: now + 5000, len: A.len, bass: A.bass, bpm: A.bpm }; bgSet(0.85);
+  game.ev = A.ev; game.ei = 0; game.xv = A.xv; game.xi = 0; game.lv = 0; game.a0 = ac.currentTime + 5; game.bgm = { t0: now + 5000, len: A.len, bass: A.bass, bpm: A.bpm, q: A.q }; game.bv = 0.7; bgSet(0.7);
   show('stage'); cancelAnimationFrame(raf); raf = requestAnimationFrame(frame); speak('Hazırlan.'); recStart();
 }
 function rdTick(now) {
@@ -837,7 +863,7 @@ function rdTick(now) {
     if (left > 0) return;
     r.ph = 'work'; r.end = now + r.w * 1000; r.h0 = g.hl.length; r.b0 = g.en.bursts; r.warn = false;
     g.en.e = 0; g.en.at = now; g.en.last = 0; g.en.T = []; g.en.on = false; g.en.drop = false;
-    bgSet(0.85);
+    g.lv = 0; g.bv = 0.7; bgSet(0.7);
     bells(1); speak(r.i ? 'Raund ' + (r.i + 1) : 'Başla!'); hud('Raund ' + (r.i + 1) + ' / ' + r.n); $('hScore').firstChild.nodeValue = 0;
     return;
   }
@@ -846,7 +872,7 @@ function rdTick(now) {
   f = fit(g.hl.slice(r.h0), r.w * 1000); f.b = g.en.bursts - r.b0; r.st.push(f);
   bells(3); g.en.on = false; g.en.T = []; g.en.bEnd = 0; g.en.e = 0; quest('round', 1);
   if (++r.i >= r.n) { finishRound(); return; }
-  r.ph = 'rest'; r.end = now + r.r * 1000; r.sec = 99; speak('Dinlen.'); bgSet(0.3);
+  r.ph = 'rest'; r.end = now + r.r * 1000; r.sec = 99; speak('Dinlen.'); g.bv = 0.3; bgSet(0.3);
 }
 function rdHit(h) {
   var g = game;
