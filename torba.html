@@ -46,7 +46,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 </head>
 <body>
 <div class="scr on" id="home">
-  <h1>Vuruş</h1><small class="v">Torba · v1.2.2</small>
+  <h1>Vuruş</h1><small class="v">Torba · v1.2.3</small>
   <p style="margin-top:16px"><b>Torbaya vur, şarkıyı sen çal.</b> Her vuruş melodinin bir notası; ne kadar sert vurursan o kadar güçlü çalar.</p>
   <div class="box"><b>Kurulum</b><p>1. Telefonu torbanın <b>en üst kısmına</b>, vuruş bölgesinin dışına, ekranı sana bakacak şekilde <b>sıkıca</b> bağla. Torbanın en az sallanan yeri üstüdür. Gevşek kayış yanlış sayar.<br>2. Sesi sonuna kadar aç, sessiz modu kapat.<br>3. BAŞLA'ya bas, sensör iznini ver.</p></div>
   <button id="start" class="big primary">BAŞLA</button>
@@ -87,6 +87,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
     <div class="row"><span>Sert vuruş eşiği</span><span><button id="pwM">−</button> <b id="pwV"></b> <button id="pwP">+</button></span></div>
     <div class="row"><span>Kılavuz ses</span><span><button id="gd"></button></span></div>
     <div class="row"><span>Klip kaydı <small class="v">deneme</small></span><span><button id="clipM" style="padding:4px 12px"></button></span></div>
+    <div class="row"><span>Saklanan denemeler <small class="v" id="sessN"></small></span><span><button id="sessAll" style="padding:4px 12px">Hepsini kopyala</button></span></div>
     <div class="row"><span>Geliştirici testi <small class="v">1 dk</small></span><span><button id="devBtn" style="padding:4px 12px">Başlat</button></span></div>
     <div class="row"><span>Ses</span><span><button id="sndT2" style="padding:4px 12px">Ses testi</button></span></div>
     <div class="row"><span>Torba ayarı</span><span><button id="recal" style="padding:4px 12px">Yeniden ayarla</button></span></div>
@@ -119,7 +120,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 <script>
 'use strict';
 var $ = function (id) { return document.getElementById(id); };
-var VER = 'torba-1.2.2', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
+var VER = 'torba-1.2.3', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
 function pn(n) { return { h: n % 2 ? 'L' : 'R', ty: Math.floor((n - 1) / 2) }; }
 function med(a) { if (!a.length) return 0; var s = a.slice().sort(function (p, q) { return p - q; }); return s[Math.floor(s.length / 2)]; }
 function r1(v) { return Math.round(v * 10) / 10; }
@@ -210,12 +211,39 @@ var SONGS = [{ n: 'Jingle Bells', by: 'Pierpont', build: jingle }, { n: 'Neşeye
 
 /* ---------- ses ---------- */
 var ac = null, noise = null, bg = null, mst = null, cmp = null;
+/* Yumuşak sınırlayıcı: sert vuruş + müzik üst üste binince çıkış 1'i aşıp cızırdamasın (Chrome'da tepe 2,8 ölçüldü).
+   0,6'ya kadar sese dokunmaz, üstünü yumuşakça 1'e yaslar. İçinden ses geçmediği ölçülürse kendini devreden çıkarır ve bunu hatırlar. */
+var lim = null, limPre = null, limSeen = 0, limBusy = 0, limA = null, limB = null;
+function limOn() {
+  if (S.nolim) { mst.connect(ac.destination); return; }
+  try {
+    var n = 2049, c = new Float32Array(n), i, u, a, T = 0.6;
+    for (i = 0; i < n; i++) { u = (i / (n - 1) * 2 - 1) * 3; a = Math.abs(u); c[i] = (u < 0 ? -1 : 1) * (a <= T ? a : T + (1 - T) * Math.tanh((a - T) / (1 - T))); }
+    limPre = ac.createGain(); limPre.gain.value = 1 / 3; lim = ac.createWaveShaper(); lim.curve = c; limPre.connect(lim); lim.connect(ac.destination); mst.connect(limPre);
+  } catch (e) { lim = null; if (limPre) limPre.gain.value = 0; mst.connect(ac.destination); }
+}
+function limOff() { limPre.gain.value = 0; lim = null; mst.connect(ac.destination); S.nolim = 1; save(); }
+function limCheck() {
+  if (!lim || limBusy || limSeen) return;
+  try {
+    var a = new Float32Array(1024), b = new Float32Array(1024), pa = 0, pb = 0, k = 0, iv;
+    if (!limA) { limA = ac.createAnalyser(); limB = ac.createAnalyser(); limA.fftSize = limB.fftSize = 1024; mst.connect(limA); lim.connect(limB); }
+    limBusy = 1;
+    iv = setInterval(function () {
+      var i, x;
+      try { limA.getFloatTimeDomainData(a); limB.getFloatTimeDomainData(b); for (i = 0; i < 1024; i++) { x = Math.abs(a[i]); if (x > pa) pa = x; x = Math.abs(b[i]); if (x > pb) pb = x; } } catch (e) { k = 99; pa = 0; limSeen = 1; }
+      if (++k < 30) return;
+      clearInterval(iv); limBusy = 0;
+      if (pa > 0.02) { limSeen = 1; if (lim && pb < pa * 0.02) limOff(); }
+    }, 30);
+  } catch (e) { limSeen = 1; limBusy = 0; }
+}
 function initAudio() {
   if (ac) { ac.resume(); return; }
   var AC = window.AudioContext || window.webkitAudioContext; ac = new AC({ latencyHint: 'interactive' });
   var len = Math.floor(ac.sampleRate * 0.5); noise = ac.createBuffer(1, len, ac.sampleRate);
   var d = noise.getChannelData(0); for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-  mst = ac.createGain(); mst.gain.value = 0.8; cmp = mst; mst.connect(ac.destination);
+  mst = ac.createGain(); mst.gain.value = 0.8; cmp = mst; limOn();
   try { ac.onstatechange = sndWarn; } catch (e) {}
   ac.resume();
 }
@@ -233,6 +261,7 @@ function nz(freq, dur, peak, t, out) {
 }
 function play(def, vol, when, dest) {
   if (!ac) return;
+  if (lim && !limSeen && !limBusy) limCheck();
   var t = Math.max(when || 0, ac.currentTime), out = ac.createGain(); out.gain.value = vol; out.connect(dest || mst);
   var p = def.split(':'), k = p[0], f = +p[1];
   if (k === 'kick') tone('sine', 160, 45, 0.28, 1, t, out);
@@ -383,7 +412,7 @@ function renderMenu() {
   $('rdN').textContent = S.rd.n + ' raund'; $('rdW').textContent = 'süre ' + mmss(S.rd.w); $('rdR').textContent = 'dinlenme ' + mmss(S.rd.r);
   $('rdInfo').textContent = S.rd.n + ' × ' + mmss(S.rd.w) + ' · dinlenme ' + mmss(S.rd.r);
   $('clipM').textContent = CLIP[S.clip || 0]; clipBtns();
-  $('devCard').style.display = S.dev ? 'none' : 'block';
+  $('devCard').style.display = S.dev ? 'none' : 'block'; $('sessN').textContent = sess.length + ' kayıt';
   $('rep').textContent = 'Raporu kopyala' + (unsent().length ? ' · ' + unsent().length + ' yeni deneme' : '');
 }
 $('songs').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { S.i = +b.getAttribute('data-i'); save(); renderMenu(); } });
@@ -413,6 +442,7 @@ function sched() {
   if (!game.ev || !bg) return;
   var lim = ac.currentTime + 1.6, e;
   while (game.ei < game.ev.length && game.a0 + game.ev[game.ei][0] < lim) { e = game.ev[game.ei++]; if (e[1] === 'rise') rise(game.a0 + e[0], e[2], bg); else play(e[1], e[2], game.a0 + e[0], bg); }
+  if (game.xv) rdSched();
 }
 function gameHit(h) {
   var g = game, now = h.t, best = null, bd = 0;
@@ -560,7 +590,7 @@ function logSession(m, sum, t0) {
     var hs = log.hits.filter(function (h) { return h.t >= t0; }), wins = hs.filter(function (h) { return h.w; });
     sess.push({ at: new Date().toISOString().slice(0, 19), v: VER, m: m, snd: ac ? ac.state : 'yok', set: [S.thr, S.pw, S.pwi, S.light, S.hard, S.lp, S.hp, S.base], sum: sum, sup: [sup.egim, sup.yanki, sup.zemin],
       hits: hs.slice(-250).map(function (h) { return [Math.round(h.t - t0), r1(h.s0), r1(h.s), Math.round(h.pk)]; }), win: (wins.length > 8 ? wins.slice(0, 4).concat(wins.slice(-4)) : wins).map(function (h) { return h.w; }), sent: 0 });
-    while (sess.length > 40) sess.shift();
+    while (sess.length > 80) sess.shift();
     localStorage.setItem(LOGKEY, JSON.stringify(sess));
   } catch (e) {}
 }
@@ -569,11 +599,24 @@ function sumOf(g) {
   return g.arc ? { kim: S.who, puan: g.sc } : g.rd ? { raund: g.rd.i + 1, faz: g.rd.ph, vurus: g.hl.length, patlama: g.en.bursts } : g.cmd ? { dogru: g.cmd.ok, sonuc: g.cmd.res }
     : g.free ? { vurus: g.n, patlama: g.en.bursts, kilit: g.en.locks, puan: g.en.score, katman: g.en.tiers, tempo: Math.round(g.en.P) } : { skor: g.score, say: g.cnt };
 }
-function sessText() {
-  var all = unsent(), u = all.slice(-12), J = JSON.stringify;
-  var t = 'denemeler (' + u.length + ' yeni' + (all.length > u.length ? '; ' + (all.length - u.length) + ' tane daha bekliyor, yeniden kopyala' : '') + ') [zaman, mod, ses, ayar, özet, bastırılan, vuruşlar (ms, anlık, şiddet, tepe), pencereler]:';
-  u.forEach(function (x) { t += '\n' + J([x.at, x.m, x.snd, x.set, x.sum, x.sup, x.hits, x.win]); x.sent = 1; });
-  try { localStorage.setItem(LOGKEY, J(sess)); } catch (e) {}
+function qs(a) {   // [en küçük, çeyrek, orta, üç çeyrek, en büyük]
+  if (!a.length) return [];
+  var s = a.slice().sort(function (x, y) { return x - y; }), f = function (p) { return s[Math.min(s.length - 1, Math.floor(p * s.length))]; };
+  return [s[0], f(0.25), f(0.5), f(0.75), s[s.length - 1]];
+}
+function sessLine(x) {   // kurulum ve ayar denemeleri tam; ötekiler özet + ilk 60 vuruş (rapor sohbete sığsın)
+  var full = /^(geliştirici|ayar)/.test(x.m), H = x.hits || [], W = x.win || [], iv = [], i, c = function (k) { return H.map(function (h) { return h[k]; }); };
+  for (i = 1; i < H.length; i++) iv.push(H[i][0] - H[i - 1][0]);
+  return JSON.stringify([x.at.slice(5), x.m, x.snd, x.set, x.sum, x.sup, H.length,
+    full ? H : { s0: qs(c(1)), s: qs(c(2)), pk: qs(c(3)), ara: qs(iv), kisa: iv.filter(function (v) { return v < 160; }).length, ilk: H.slice(0, 60).map(function (h) { return [Math.round(h[0] / 10), Math.round(h[1]), Math.round(h[2]), h[3]]; }) },
+    full || W.length <= 2 ? W : [W[0], W[W.length - 1]]]);
+}
+function sessText(all) {   // all: daha önce kopyalananlar dahil saklanan bütün denemeler
+  var u = all ? sess : unsent();
+  var t = 'denemeler (' + u.length + (all ? ' kayıt, tamamı' : ' yeni') + ') [gün-saat, mod, ses, ayar, özet, bastırılan, vuruş sayısı, vuruşlar, pencereler]\n' +
+    'tam satırda vuruş = [ms, anlık, şiddet, tepe]; özet satırda dağılımlar [en küçük, çeyrek, orta, üç çeyrek, en büyük], ara = vuruş aralığı ms, kisa = 160 ms altı aralık sayısı, ilk = ilk 60 vuruş [ms/10, anlık, şiddet, tepe]:';
+  u.forEach(function (x) { t += '\n' + sessLine(x); x.sent = 1; });
+  try { localStorage.setItem(LOGKEY, JSON.stringify(sess)); } catch (e) {}
   return t;
 }
 
@@ -671,7 +714,14 @@ setInterval(bandTick, 20);
 function layer(n, from, to, burst, v) {
   if (from <= 1 && (to >= 1 || burst)) play('chord:' + n.rt * 2, 0.22 + 0.2 * v, 0, bg);
   if (from <= 1 && burst) { if (n.fq) play('pluck:' + n.fq * 2, 0.3 * v, 0, bg); else play('hat', 0.3, 0, bg); }
-  if (from <= 2 && to >= 2) fx('boom', 0.75);
+  if (from <= 2 && to >= 2) { fx('boom', 0.75); duck(); }
+}
+function bgSet(v) {   // müzik yolunun sesi; planlanmış geri çekilmeyi de siler
+  if (!bg) return; try { bg.gain.cancelScheduledValues(ac.currentTime); bg.gain.setValueAtTime(v, ac.currentTime); } catch (e) {} bg.gain.value = v;
+}
+function duck() {   // raundda sert vuruşta müzik bir an geri çekilir: vuruş öne çıkar, toplam ses taşmaz
+  if (!bg || !game || !game.bgm) return;
+  var t = ac.currentTime; try { bg.gain.cancelScheduledValues(t); bg.gain.setValueAtTime(0.55, t); bg.gain.linearRampToValueAtTime(0.85, t + 0.16); } catch (e) {}
 }
 function burstGo(g, now) {
   var en = g.en; en.e = 1; en.bEnd = now + BURST; en.bursts++; S.dBurst = (S.dBurst || 0) + 1;
@@ -686,7 +736,7 @@ function enHit(g, h) {
   // Arkada müzik çalarken (raund) vuruş melodi çalmaz: davul vurur, sertleştikçe o anki akor ve bas davul eklenir.
   if (g.bgm) fx('tom', 0.5 + 0.5 * v); else play('pluck:' + n.fq, v, 0, bg);
   layer(n, 1, t0, burst, v);
-  if (!g.bgm) bandHit(en, now);
+  if (g.bgm) en.last = now; else bandHit(en, now);   // raundda tempo şarkınındır; son vuruş anı patlamanın sürmesi ve durunca sönme için tutulur
   if (!burst) {
     rel = Math.max(0, Math.min(1, (h.s0 - S.thr) / Math.max(1, S.hp - S.thr)));
     en.e = Math.min(1, en.e + 0.02 + 0.05 * rel);
@@ -726,21 +776,57 @@ function freeHit(h) {
 var RDW = [30, 60, 120, 180], RDR = [30, 60];
 function mmss(s) { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2); }
 function bells(k) { for (var i = 0; i < k; i++) play('bell:988', 0.7, ac.currentTime + i * 0.38); }
+/* ---------- raund düzenlemesi ----------
+   Şarkı kendi temposundan raund temposuna çekilir (seviyeye göre 116 / 126 / 136 vuruş/dk) ve dört kat halinde kurulur:
+   0 temel (her zaman): davul, bas, melodi · 1 vurdukça: her vuruşta bas davul + bas yürüyüşü · 2 enerji yükselince ve son on saniyede: on altılık zil + akor vuruşları
+   3 patlamada: melodi bir oktav üstten ikilenir + zil. Temel kat 1,6 sn önceden, üst katlar 0,2 sn önceden planlanır; böylece müzik vuruşa hemen cevap verir. */
+var RBPM = [116, 126, 136], RLV = ['Vur, müzik büyüsün', 'Ritim açıldı', 'Tam gaz', 'PATLAMA'];
+function rdChart(i, lvl, secs) {
+  var ch = SONGS[i].build(lvl), G = ch.grid.map(function (x) { return x[0]; }), q = 60 / RBPM[lvl], nb = G.length / 2, ev = [], xv = [], N, B, k, b, o, rt, loops;
+  function pos(t) {   // şarkının kendi zamanı (ms) -> vuruş konumu; ızgara her yarım vuruşta bir işaret taşır (hızlanan şarkıda da)
+    var j = 0, nx; while (j + 1 < G.length && G[j + 1] <= t) j++;
+    nx = j + 1 < G.length ? G[j + 1] : ch.len; return Math.round((j + Math.min(1, Math.max(0, (t - G[j]) / Math.max(1, nx - G[j])))) * 2) / 4;
+  }
+  function root(b) { var r = B.length ? B[0][1] : 130.81, m; for (m = 0; m < B.length && B[m][0] <= b + 0.001; m++) r = B[m][1]; return r; }
+  N = ch.notes.map(function (x) { return [pos(x.t), x.fq]; }); B = (ch.bass || []).map(function (x) { return [pos(x[0]), x[1]]; });
+  loops = Math.ceil(secs / (nb * q)) + 1;
+  for (k = 0; k < loops; k++) {
+    o = k * nb;
+    for (b = 0; b < nb; b++) {
+      rt = root(b);
+      ev.push([(o + b) * q, b % 2 ? 'snare' : 'kick', b % 2 ? 0.3 : 0.55], [(o + b + 0.5) * q, 'hat', 0.12]);
+      if (b % 2) xv.push([(o + b) * q, 'kick', 0.5, 1]);
+      xv.push([(o + b + 0.5) * q, 'bass:' + root(b + 0.5), 0.26, 1]);
+      xv.push([(o + b + 0.25) * q, 'hat', 0.07, 2], [(o + b + 0.75) * q, 'hat', 0.07, 2]);
+      if (b % 2) xv.push([(o + b + 0.5) * q, 'chord:' + rt * 2, 0.15, 2]);
+      if (b % 8 === 0) xv.push([(o + b) * q, 'crash', 0.22, 3]);
+    }
+    B.forEach(function (x) { ev.push([(o + x[0]) * q, 'bass:' + x[1], 0.4]); });
+    N.forEach(function (x) { ev.push([(o + x[0]) * q, 'pluck:' + x[1], 0.32]); xv.push([(o + x[0]) * q, 'pluck:' + x[1] * 2, 0.17, 3]); });
+  }
+  ev.sort(function (a, c) { return a[0] - c[0]; }); xv.sort(function (a, c) { return a[0] - c[0]; });
+  return { ev: ev, xv: xv, len: nb * q * 1000, bass: B.map(function (x) { return [x[0] * q * 1000, x[1]]; }), bpm: RBPM[lvl] };
+}
+function rdLv(g, now) {   // müziğin o anki katı
+  var r = g.rd, en = g.en, k = 0, i, lv;
+  if (r.ph !== 'work') return 0;
+  for (i = g.hl.length - 1; i >= r.h0 && now - g.hl[i].t <= 3000; i--) k++;
+  lv = now < en.bEnd ? 3 : en.e >= 0.45 ? 2 : (k >= 3 || en.e >= 0.15) ? 1 : 0;
+  return r.warn ? Math.max(lv, 2) : lv;   // son on saniye: hücum
+}
+function rdSched() {   // üst katlar: son anda, o anki kata göre
+  var g = game, t = ac.currentTime, lim = t + 0.22, e;
+  g.lv = rdLv(g, performance.now());
+  while (g.xi < g.xv.length && g.a0 + g.xv[g.xi][0] < lim) { e = g.xv[g.xi++]; if (e[3] <= g.lv && g.a0 + e[0] >= t - 0.03) play(e[1], e[2], g.a0 + e[0], bg); }
+}
 function startRound() {
   initAudio(); var now = performance.now();
   game = { free: true, i: S.i, notes: [], seq: seqOf(S.i), n: 0, t0: now, beat: 600, len: 1, fx: [], pop: null, hl: [], done: false, en: enNew(),
     rd: { i: 0, n: S.rd.n, w: S.rd.w, r: S.rd.r, ph: 'prep', end: now + 5000, st: [], h0: 0, b0: 0, sec: 99, warn: false } };
   newBus(); mode = 'round'; hud('Raund 1 / ' + S.rd.n); lastStart = startRound;
-  // Arkada sürekli müzik: seçili şarkı (davul, bas, melodi) seçili seviyenin temposunda döner. Dinlenmede kısılır.
-  var ch = SONGS[S.i].build(S.lvl), loops = Math.ceil(S.rd.n * (S.rd.w + S.rd.r) * 1000 / ch.len) + 1, ev = [], k, off;
-  for (k = 0; k < loops; k++) {
-    off = k * ch.len / 1000;
-    ch.grid.forEach(function (x) { ev.push([off + x[0] / 1000, ['kick', 'snare', 'hat'][x[1]], [0.55, 0.3, 0.12][x[1]]]); });
-    (ch.bass || []).forEach(function (x) { ev.push([off + x[0] / 1000, 'bass:' + x[1], 0.4]); });
-    ch.notes.forEach(function (x) { ev.push([off + x.t / 1000, 'pluck:' + x.fq, 0.32]); });
-  }
-  ev.sort(function (p, q) { return p[0] - q[0]; });
-  game.ev = ev; game.ei = 0; game.a0 = ac.currentTime + 5; game.bgm = { t0: now + 5000, len: ch.len, bass: ch.bass || [] }; bg.gain.value = 0.85;
+  // Arkada sürekli müzik: seçili şarkı raund temposunda döner; vurdukça katman açılır (rdChart, rdLv, rdSched).
+  var A = rdChart(S.i, S.lvl, S.rd.n * (S.rd.w + S.rd.r) + 2);
+  game.ev = A.ev; game.ei = 0; game.xv = A.xv; game.xi = 0; game.lv = 0; game.a0 = ac.currentTime + 5; game.bgm = { t0: now + 5000, len: A.len, bass: A.bass, bpm: A.bpm }; bgSet(0.85);
   show('stage'); cancelAnimationFrame(raf); raf = requestAnimationFrame(frame); speak('Hazırlan.'); recStart();
 }
 function rdTick(now) {
@@ -751,16 +837,16 @@ function rdTick(now) {
     if (left > 0) return;
     r.ph = 'work'; r.end = now + r.w * 1000; r.h0 = g.hl.length; r.b0 = g.en.bursts; r.warn = false;
     g.en.e = 0; g.en.at = now; g.en.last = 0; g.en.T = []; g.en.on = false; g.en.drop = false;
-    if (bg) bg.gain.value = 0.85;
+    bgSet(0.85);
     bells(1); speak(r.i ? 'Raund ' + (r.i + 1) : 'Başla!'); hud('Raund ' + (r.i + 1) + ' / ' + r.n); $('hScore').firstChild.nodeValue = 0;
     return;
   }
-  if (!r.warn && r.w >= 30 && left <= 10) { r.warn = true; play('tick', 0.8); play('tick', 0.8, ac.currentTime + 0.15); play('tick', 0.8, ac.currentTime + 0.3); speak('Son on saniye!'); }
+  if (!r.warn && r.w >= 30 && left <= 10) { r.warn = true; play('tick', 0.8); play('tick', 0.8, ac.currentTime + 0.15); play('tick', 0.8, ac.currentTime + 0.3); if (bg) rise(ac.currentTime + 0.05, 1.4, bg); speak('Son on saniye, hepsini ver!'); }
   if (left > 0) return;
   f = fit(g.hl.slice(r.h0), r.w * 1000); f.b = g.en.bursts - r.b0; r.st.push(f);
   bells(3); g.en.on = false; g.en.T = []; g.en.bEnd = 0; g.en.e = 0; quest('round', 1);
   if (++r.i >= r.n) { finishRound(); return; }
-  r.ph = 'rest'; r.end = now + r.r * 1000; r.sec = 99; speak('Dinlen.'); if (bg) bg.gain.value = 0.3;
+  r.ph = 'rest'; r.end = now + r.r * 1000; r.sec = 99; speak('Dinlen.'); bgSet(0.3);
 }
 function rdHit(h) {
   var g = game;
@@ -835,7 +921,7 @@ function finishCmd() {
 function drawEn(g, en, now, W, cx, y, F) {
   var bw = W * 0.72, bh = W * 0.07, x = cx - bw / 2, burst = now < en.bEnd, e = Math.max(0, Math.min(1, en.e));
   g.fillStyle = en.on ? '#3ddc97' : '#98a2ab'; g.font = '600 ' + Math.round(W * 0.04) + F;
-  g.fillText(en.on ? '♪ Grup seninle · tempo ' + Math.round(60000 / en.P) : game && game.bgm ? '♪ Müzik çalıyor · vurdukça büyür' : 'Düzenli vur, grup sana katılsın', cx, y - W * 0.05);
+  g.fillText(en.on ? '♪ Grup seninle · tempo ' + Math.round(60000 / en.P) : game && game.bgm ? '♪ ' + RLV[game.lv || 0] + ' · ' + game.bgm.bpm + ' vuruş/dk' : 'Düzenli vur, grup sana katılsın', cx, y - W * 0.05);
   g.fillStyle = 'rgba(255,255,255,.1)'; g.fillRect(x, y, bw, bh);
   g.fillStyle = burst ? '#ffb020' : e >= 0.6 ? '#ff4d6d' : e >= 0.3 ? '#3ddc97' : '#3da5ff'; g.fillRect(x, y, bw * e, bh);
   g.fillStyle = burst ? '#ffb020' : '#98a2ab'; g.font = '600 ' + Math.round(W * 0.035) + F;
@@ -1007,7 +1093,7 @@ function dataObj() {
 }
 $('rep').addEventListener('click', function () {
   var d = dataObj(), J = JSON.stringify, txt = 'Vuruş ' + d.ver + ' raporu\n' +
-    'cihaz: ' + d.ua + ' | sensör aralığı: ' + d.int + ' ms | en büyük ölçüm: ' + d.maxM + ' m/s² | ses motoru: ' + d.snd + '\n' +
+    'cihaz: ' + d.ua + ' | sensör aralığı: ' + d.int + ' ms | en büyük ölçüm: ' + d.maxM + ' m/s² | ses motoru: ' + d.snd + (lim ? ' (sınırlayıcı açık)' : S.nolim ? ' (sınırlayıcı kendini kapattı)' : '') + '\n' +
     'ayar: ' + J(d.set) + '\n' +
     'bastırılan tetikleme [eğim, yankı, zemin]: ' + J(d.sup) + ' | zemin rms (son 20): ' + J(d.base.slice(-20)) + '\n' +
     'oyunlar (son 5): ' + J(d.games.slice(-5)) + '\n' +
@@ -1174,6 +1260,11 @@ function devDone() {
 $('devGo').addEventListener('click', function () {
   var first = dev && dev.first; dev = null; mode = 'idle'; $('devGo').style.display = 'none'; $('calSkip').style.display = '';
   if (first) startFree(true); else { renderMenu(); show('menu'); }
+});
+$('sessAll').addEventListener('click', function () {
+  var txt = 'Vuruş ' + VER + ' · saklanan bütün denemeler\n' + sessText(true), ta = $('out'); ta.value = txt; ta.style.display = 'block'; renderMenu();
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(function () { toast('Kopyalandı. Sohbete yapıştır.'); }).catch(function () { ta.select(); toast('Aşağıdaki metni elle kopyala.'); });
+  else { ta.select(); toast('Aşağıdaki metni elle kopyala.'); }
 });
 $('devBtn').addEventListener('click', devStart); $('devCardGo').addEventListener('click', devStart);
 var wl = null;
