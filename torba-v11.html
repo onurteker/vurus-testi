@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b0d10">
+<title>Vuruş · Torba</title>
+<style>
+:root{--bg:#0b0d10;--panel:#161a1f;--line:#2a3038;--ink:#f2f4f5;--dim:#98a2ab;--hit:#ffb020;--ok:#3ddc97;--bad:#ff6b6b;--pow:#ff4d6d;--n:#3da5ff}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:17px/1.4 -apple-system,system-ui,"Segoe UI",Roboto,sans-serif;overscroll-behavior:none;-webkit-user-select:none;user-select:none}
+.scr{display:none;position:fixed;inset:0;overflow:auto;padding:calc(14px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))}
+.scr.on{display:block}
+h1{font-size:30px;margin:8px 0 2px}h2{font-size:13px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin:18px 0 8px}
+p{color:var(--dim);margin:8px 0}b{color:var(--ink)}
+button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;min-height:52px;touch-action:manipulation}
+button:active{transform:scale(.98)}button.sel{border-color:var(--hit);color:var(--hit);font-weight:700}
+button.primary{background:var(--hit);color:#111;border:0;font-weight:800}
+.big{width:100%;font-size:24px;min-height:76px;margin-top:14px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.row{display:flex;align-items:center;gap:8px;justify-content:space-between;padding:6px 0}
+.row button{min-height:40px;min-width:48px;padding:4px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin:10px 0}
+#cal{text-align:center;padding-top:12vh}#calBig{font-size:44px;font-weight:800}#calDots{font-size:54px;letter-spacing:10px;color:var(--hit)}
+#stage{padding:0;overflow:hidden}#cv{width:100%;height:100%;display:block;touch-action:none}
+#hud{position:absolute;left:0;right:0;top:env(safe-area-inset-top);display:flex;justify-content:space-between;padding:10px 16px;pointer-events:none;font-variant-numeric:tabular-nums}
+#hScore{font-size:34px;font-weight:800}#hCombo{font-size:34px;font-weight:800;color:var(--hit);text-align:right}
+#hud small{display:block;color:var(--dim);font-size:13px;font-weight:400}
+#prog{position:absolute;left:0;bottom:0;height:6px;background:var(--hit);width:0}
+#quit{position:absolute;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translateX(-50%);min-width:170px;font-weight:700;border-color:var(--bad);color:var(--bad);background:rgba(11,13,16,.85)}
+#stars{font-size:52px;letter-spacing:6px;color:var(--hit);text-align:center}#rScore{font-size:64px;font-weight:800;text-align:center;line-height:1.1}
+dl{margin:12px 0;display:grid;grid-template-columns:1fr auto;gap:6px 12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px}
+dt{color:var(--dim)}dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+#toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#222a31;border:1px solid var(--line);padding:8px 14px;border-radius:10px;font-size:14px;display:none;z-index:9;max-width:90vw}
+small.v{color:var(--dim);font-size:12px}
+</style>
+</head>
+<body>
+<div class="scr on" id="home">
+  <h1>Vuruş</h1><small class="v">Torba · v1.1</small>
+  <p style="margin-top:16px"><b>Torbaya vur, şarkıyı sen çal.</b> Her vuruş melodinin bir notası; ne kadar sert vurursan o kadar güçlü çalar.</p>
+  <div class="box"><b>Kurulum</b><p>1. Telefonu torbanın <b>en üst kısmına</b>, vuruş bölgesinin dışına, ekranı sana bakacak şekilde <b>sıkıca</b> bağla. Torbanın en az sallanan yeri üstüdür. Gevşek kayış yanlış sayar.<br>2. Sesi sonuna kadar aç, sessiz modu kapat.<br>3. BAŞLA'ya bas, sensör iznini ver.</p></div>
+  <button id="start" class="big primary">BAŞLA</button>
+  <p id="msg"></p>
+</div>
+<div class="scr" id="cal"><div id="calBig"></div><div id="calDots"></div><p id="calSub"></p>
+  <div style="height:12px;background:var(--panel);border-radius:6px;margin:26px 0 8px;overflow:hidden"><div id="calBar" style="height:12px;width:0;background:var(--n)"></div></div>
+  <p style="font-size:14px">Çubuk, telefonun hissettiği sarsıntıyı gösterir. Vurduğunda oynamıyorsa telefon iyi bağlanmamıştır.</p>
+  <button id="calSkip" style="margin-top:18px">Atla, varsayılan ayarla devam et</button>
+</div>
+<div class="scr" id="menu">
+  <h1>Vuruş</h1><small class="v" id="today"></small>
+  <p id="live" style="margin:6px 0 0;font-size:14px">Torbaya vur: algılanan her vuruş ses çıkarır.</p><p id="warn" style="margin:4px 0 0;font-size:14px;color:var(--bad)"></p>
+  <h2>Şarkı</h2><div class="g3" id="songs"></div>
+  <h2>Seviye</h2><div class="g3" id="lvls"></div>
+  <button id="go" class="big primary">OYNA</button>
+  <div class="g3" style="margin-top:8px;font-size:15px"><button id="arc">Güç makinesi</button><button id="free">Serbest çal</button><button id="recal">Yeniden ayarla</button></div>
+  <p>Mavi notada vur. <b style="color:var(--pow)">Kırmızı büyük notada sert vur.</b> Ekranı göremiyorsan kulağınla çal: davul tempoyu, kısık zil notanın yerini, yükselen ses sert vuruşu haber verir. Serbest çalda şarkı senin hızında ilerler. <b>Güç makinesi</b> jetonlu boks makinesi gibidir: üç hak, her hakta tek yumruk, 0–999 puan. Puan son ayara göre ölçeklenir; yarışacaksanız ayarı bir kişi yapsın, herkes aynı ayarla vursun.</p>
+  <h2>İnce ayar</h2>
+  <div class="box">
+    <div class="row"><span>Vuruş eşiği</span><span><button id="thM">−</button> <b id="thV"></b> <button id="thP">+</button></span></div>
+    <div class="row"><span>Sert vuruş eşiği</span><span><button id="pwM">−</button> <b id="pwV"></b> <button id="pwP">+</button></span></div>
+    <div class="row"><span>Kılavuz ses</span><span><button id="gd"></button></span></div>
+    <p style="margin:4px 0 0;font-size:14px">Vurmadan ses çıkıyorsa vuruş eşiğini büyüt; hafif vuruşlar kaçıyorsa küçült.</p>
+  </div>
+  <div class="g2"><button id="rep" class="primary" style="min-height:52px">Raporu kopyala</button><button id="data">Dosya olarak paylaş</button></div>
+  <textarea id="out" readonly style="display:none;width:100%;min-height:120px;margin-top:8px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:10px;font:11px ui-monospace,monospace"></textarea>
+</div>
+<div class="scr" id="stage"><canvas id="cv"></canvas>
+  <div id="hud"><div id="hScore">0<small id="hSong"></small></div><div id="hCombo"><span id="hC">0</span><small id="hM">kombo</small></div></div>
+  <div id="prog"></div><button id="quit">DURDUR · basılı tut</button>
+</div>
+<div class="scr" id="result">
+  <div id="stars"></div><div id="rScore"></div><p id="rSong" style="text-align:center"></p>
+  <dl id="rStats"></dl>
+  <div class="g3"><button id="share" class="primary">Paylaş</button><button id="again">Tekrar</button><button id="back">Menü</button></div>
+</div>
+<div id="toast"></div>
+<script>
+'use strict';
+var $ = function (id) { return document.getElementById(id); };
+var VER = 'torba-1.1', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
+function pn(n) { return { h: n % 2 ? 'L' : 'R', ty: Math.floor((n - 1) / 2) }; }
+function med(a) { if (!a.length) return 0; var s = a.slice().sort(function (p, q) { return p - q; }); return s[Math.floor(s.length / 2)]; }
+function r1(v) { return Math.round(v * 10) / 10; }
+function toast(t) { var e = $('toast'); e.textContent = t; e.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(function () { e.style.display = 'none'; }, 2600); }
+function speak(t) { try { var u = new SpeechSynthesisUtterance(t); u.lang = 'tr-TR'; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) {} }
+var S = { thr: 4, pw: 14, pwi: 24, light: 8, hard: 25, lp: 12, hp: 40, base: 0.3, cal: 0, first: 0, ver: 2, best: {}, bias: 0, i: 0, lvl: 0, day: '', dHits: 0, dPow: 0, guide: 1 };
+try { var sv = JSON.parse(localStorage.getItem('vurus_torba') || 'null'); if (sv) for (var k in sv) S[k] = sv[k]; } catch (e) {}
+if (S.ver !== 2) { S.ver = 2; S.cal = 0; S.first = 0; S.thr = 4; S.pw = 14; S.pwi = 24; S.light = 8; S.hard = 25; S.lp = 12; S.hp = 40; S.bias = 0; }
+function save() { try { localStorage.setItem('vurus_torba', JSON.stringify(S)); } catch (e) {} }
+function show(id) { ['home', 'cal', 'menu', 'stage', 'result'].forEach(function (s) { $(s).className = 'scr' + (s === id ? ' on' : ''); }); if (id === 'stage') size(); }
+
+/* ---------- şarkılar ---------- */
+var BQ = { C: 130.81, D: 146.83, E: 164.81, F: 174.61, G: 98, A: 110 };
+var FQ = { G3: 196, A3: 220, Bb3: 233.08, B3: 246.94, C: 261.63, D: 293.66, Eb: 311.13, E: 329.63, F: 349.23, G: 392, A: 440 };
+// Jingle Bells, nakarat (J. L. Pierpont, 1857; kamu malı). Bas: her ölçüde 1. ve 3. vuruş.
+function jingle(lvl) {
+  var q = 60000 / [84, 100, 120][lvl], notes = [], grid = [], bass = [], b;
+  var A = [[0, 1, 'E'], [1, 2, 'E'], [2, 1, 'E'], [4, 2, 'E'], [5, 1, 'E'], [6, 2, 'E'], [8, 1, 'E'], [9, 2, 'G'], [10, 3, 'C'], [11.5, 2, 'D'], [12, 1, 'E'],
+    [16, 2, 'F'], [17, 1, 'F'], [18, 2, 'F'], [19.5, 1, 'F'], [20, 2, 'F'], [21, 1, 'E'], [22, 2, 'E'], [23, 1, 'E'], [23.5, 2, 'E']];
+  var e1 = A.concat([[24, 1, 'E'], [25, 2, 'D'], [26, 1, 'D'], [27, 2, 'E'], [28, 5, 'D'], [30, 6, 'G']]);
+  var e2 = A.concat([[24, 3, 'G'], [25, 2, 'G'], [26, 1, 'F'], [27, 2, 'D'], [28, 5, 'C']]);
+  var ch1 = ['C', 'C', 'C', 'C', 'F', 'C', 'D', 'G'], ch2 = ['C', 'C', 'C', 'C', 'F', 'C', 'G', 'C'];
+  var lines = lvl === 0 ? [[e1, ch1], [e2, ch2]] : [[e1, ch1], [e2, ch2], [e1, ch1], [e2, ch2]];
+  lines.forEach(function (ln, k) {
+    ln[0].forEach(function (n) { notes.push({ t: Math.round((k * 32 + n[0]) * q), p: n[1], fq: FQ[n[2]] }); });
+    ln[1].forEach(function (c, m) { bass.push([Math.round((k * 32 + m * 4) * q), BQ[c]], [Math.round((k * 32 + m * 4 + 2) * q), BQ[c]]); });
+  });
+  for (b = 0; b < lines.length * 32; b += 0.5) grid.push([Math.round(b * q), b % 1 ? 2 : (b % 2 ? 1 : 0)]);
+  return { notes: notes, grid: grid, bass: bass, len: Math.round(lines.length * 32 * q), beat: q };
+}
+function ode(lvl) {
+  var q = 60000 / [72, 84, 100][lvl], notes = [], grid = [], b;
+  var A = [[0, 1, 'E'], [1, 2, 'E'], [2, 3, 'F'], [3, 2, 'G'], [4, 1, 'G'], [5, 2, 'F'], [6, 3, 'E'], [7, 2, 'D'], [8, 1, 'C'], [9, 2, 'C'], [10, 5, 'D'], [11, 2, 'E']];
+  var e1 = A.concat([[12, 1, 'E'], [13.5, 1, 'D'], [14, 2, 'D']]), e2 = A.concat([[12, 3, 'D'], [13.5, 1, 'C'], [14, 2, 'C']]);
+  var B = [[0, 1, 'D'], [1, 2, 'D'], [2, 3, 'E'], [3, 2, 'C'], [4, 1, 'D'], [5, 2, 'E'], [5.5, 3, 'F'], [6, 2, 'E'], [7, 1, 'C'], [8, 2, 'D'], [9, 1, 'E'], [9.5, 2, 'F'], [10, 3, 'E'], [11, 2, 'D'], [12, 1, 'C'], [13, 2, 'D'], [14, 5, 'G3']];
+  var lines = lvl === 0 ? [e1, e2] : [e1, e2, B, e2];
+  lines.forEach(function (ln, k) { ln.forEach(function (n) { notes.push({ t: Math.round((k * 16 + n[0]) * q), p: n[1], fq: FQ[n[2]] }); }); });
+  for (b = 0; b < lines.length * 16; b += 0.5) grid.push([Math.round(b * q), b % 1 ? 2 : (b % 2 ? 1 : 0)]);
+  var bass = [], BA = ['C', 'G', 'C', 'C', 'C', 'G'], pat = [BA.concat(['C', 'G']), BA.concat(['G', 'C']), ['G', 'C', 'G', 'C', 'G', 'C', 'C', 'G'], BA.concat(['G', 'C'])];
+  lines.forEach(function (ln, k) { pat[lvl === 0 ? k : k].forEach(function (c, m) { bass.push([Math.round((k * 16 + m * 2) * q), BQ[c]]); }); });
+  return { notes: notes, grid: grid, bass: bass, len: Math.round(lines.length * 16 * q), beat: q };
+}
+function king(lvl) {
+  var sp = [[540, 460], [560, 450, 370], [480, 390, 320]][lvl], notes = [], grid = [], t0 = 0, s;
+  var bar = [[0, 1, 'A3'], [1, 2, 'B3'], [2, 1, 'C'], [3, 2, 'D'], [4, 5, 'E'], [5, 2, 'C'], [6, 3, 'E'],
+    [8, 2, 'Eb'], [9, 3, 'B3'], [10, 2, 'Eb'], [12, 1, 'D'], [13, 2, 'Bb3'], [14, 1, 'D'],
+    [16, 1, 'A3'], [17, 2, 'B3'], [18, 1, 'C'], [19, 2, 'D'], [20, 5, 'E'], [21, 2, 'C'], [22, 3, 'E'], [23, 2, 'A'],
+    [24, 1, 'G'], [25, 2, 'E'], [26, 3, 'C'], [27, 2, 'E'], [28, 5, 'G']];
+  var bass = [];
+  sp.forEach(function (d) {
+    for (s = 0; s < 32; s += 4) bass.push([Math.round(t0 + s * d), s % 8 ? BQ.E : BQ.A]);
+    bar.forEach(function (n) { notes.push({ t: Math.round(t0 + n[0] * d), p: n[1], fq: FQ[n[2]] }); });
+    for (s = 0; s < 32; s++) grid.push([Math.round(t0 + s * d), s % 2 ? 2 : (s % 8 === 4 ? 1 : 0)]);
+    t0 += 32 * d;
+  });
+  return { notes: notes, grid: grid, bass: bass, len: Math.round(t0), beat: sp[0] * 2 };
+}
+var SONGS = [{ n: 'Jingle Bells', by: 'Pierpont', build: jingle }, { n: 'Neşeye Övgü', by: 'Beethoven', build: ode }, { n: 'Dağ Kralının Salonunda', by: 'Grieg', build: king }];
+
+/* ---------- ses ---------- */
+var ac = null, noise = null, bg = null;
+function initAudio() {
+  if (ac) { ac.resume(); return; }
+  var AC = window.AudioContext || window.webkitAudioContext; ac = new AC({ latencyHint: 'interactive' });
+  var len = Math.floor(ac.sampleRate * 0.5); noise = ac.createBuffer(1, len, ac.sampleRate);
+  var d = noise.getChannelData(0); for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  ac.resume();
+}
+function tone(type, f0, f1, dur, peak, t, out) {
+  var o = ac.createOscillator(), g = ac.createGain(); o.type = type;
+  o.frequency.setValueAtTime(f0, t); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.5);
+  g.gain.setValueAtTime(peak, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(out); o.start(t); o.stop(t + dur + 0.02);
+}
+function nz(freq, dur, peak, t, out) {
+  var n = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  n.buffer = noise; f.type = 'highpass'; f.frequency.value = freq;
+  g.gain.setValueAtTime(peak, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  n.connect(f); f.connect(g); g.connect(out); n.start(t); n.stop(t + dur + 0.02);
+}
+function play(def, vol, when, dest) {
+  if (!ac) return;
+  var t = Math.max(when || 0, ac.currentTime), out = ac.createGain(); out.gain.value = vol; out.connect(dest || ac.destination);
+  var p = def.split(':'), k = p[0], f = +p[1];
+  if (k === 'kick') tone('sine', 160, 45, 0.28, 1, t, out);
+  else if (k === 'snare') { nz(1200, 0.16, 0.9, t, out); tone('triangle', 190, 0, 0.09, 0.6, t, out); }
+  else if (k === 'hat') nz(7000, 0.06, 0.7, t, out);
+  else if (k === 'bass') { tone('triangle', f, 0, 0.4, 0.7, t, out); tone('sine', f, 0, 0.45, 0.6, t, out); }
+  else if (k === 'pluck') { tone('triangle', f, 0, 0.45, 0.8, t, out); tone('sine', f * 2, 0, 0.25, 0.25, t, out); }
+  else if (k === 'bell') { tone('sine', f, 0, 0.7, 0.6, t, out); tone('sine', f * 2, 0, 0.5, 0.25, t, out); }
+  else if (k === 'buzz') tone('square', 90, 0, 0.18, 0.35, t, out);
+  else if (k === 'tick') tone('sine', 1320, 0, 0.07, 0.5, t, out);
+}
+
+
+function fx(kind, vol) {
+  if (!ac) return; var t = ac.currentTime, out = ac.createGain(); out.gain.value = vol; out.connect(ac.destination);
+  if (kind === 'tom') tone('sine', 190, 95, 0.2, 0.9, t, out);
+  else { tone('sine', 150, 38, 0.6, 1, t, out); nz(2500, 0.4, 0.45, t, out); }
+}
+function rise(t, dur, out) {
+  if (t < ac.currentTime) return;
+  var n = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  n.buffer = noise; n.loop = true; f.type = 'bandpass'; f.frequency.setValueAtTime(600, t); f.frequency.exponentialRampToValueAtTime(5000, t + dur);
+  g.gain.setValueAtTime(0.001, t); g.gain.exponentialRampToValueAtTime(0.22, t + dur); g.gain.setValueAtTime(0.001, t + dur + 0.01);
+  n.connect(f); f.connect(g); g.connect(out); n.start(t); n.stop(t + dur + 0.03);
+}
+function vol(s) { return Math.max(0.35, Math.min(1, 0.35 + 0.65 * (s - S.thr) / Math.max(1, S.hp - S.thr))); }
+
+/* ---------- vuruş algılama: torbadaki telefon yalnızca darbeyle sarsılır ---------- */
+var running = false, mode = 'idle', buf = [], open = [], state = 0, until = 0, last = 0, deltas = [], lp = null, bAcc = 0, bN = 0;
+var ema = 0, prevM = 0, lastH = null, maxM = 0, sup = { egim: 0, yanki: 0, zemin: 0 };
+var log = { hits: [], base: [], games: [], arc: [] };
+function top3(v) { var a = v.slice().sort(function (p, q) { return q - p; }); return (a[0] + a[1] + a[2]) / 3; }
+// Sert sayılma: ilk örnek açıkça sertse hemen, değilse 67 ms'lik ölçüm bitince.
+function strong(h) { return h.s0 >= S.pwi || (h.n >= 4 && h.s >= S.pw); }
+function onMotion(e) {
+  var a = e.acceleration, g = e.accelerationIncludingGravity, x, y, z;
+  if (a && a.x != null) { x = a.x; y = a.y; z = a.z; }
+  else if (g && g.x != null) { lp = lp ? [lp[0] * 0.9 + g.x * 0.1, lp[1] * 0.9 + g.y * 0.1, lp[2] * 0.9 + g.z * 0.1] : [g.x, g.y, g.z]; x = g.x - lp[0]; y = g.y - lp[1]; z = g.z - lp[2]; }
+  else return;
+  var t = performance.now(), m = Math.sqrt(x * x + y * y + z * z), i, h;
+  if (last) { deltas.push(t - last); if (deltas.length > 120) deltas.shift(); } last = t;
+  if (m > maxM) maxM = m;
+  buf.push(r1(m)); if (buf.length > 26) buf.shift();
+  for (i = open.length - 1; i >= 0; i--) {
+    h = open[i]; h.n++;
+    // Şiddet: darbeden sonraki 67 ms'nin en büyük üç örneğinin ortalaması. Tek örnekli tepeden daha kararlı,
+    // sensör tavana vurduğunda da sert ile hafifi ayırır.
+    if (h.n <= 4) { h.v.push(m); if (h.n === 4) { h.pk = Math.max.apply(null, h.v); h.s = top3(h.v); if (h.up) h.up(); } }
+    if (h.n >= 16) { h.w = buf.slice(-23); open.splice(i, 1); }
+  }
+  if (mode === 'cal' && calS) calTick(t, m);
+  var base = mode === 'cal' ? (calS && calS.step >= 0 ? calS.thr : 1e9) : S.thr;
+  // Üç koruma: sallanan torbada yükselen zemin, vuruş sonrası yankı (zincir, geri tepme), ve yumuşak salınım (ani sıçrama şartı).
+  var floor = Math.max(base, 2.2 * ema + 1), dyn = lastH ? lastH.pk * 0.5 * Math.max(0, 1 - (t - lastH.t) / 450) : 0;
+  if (state === 0) {
+    if (m > floor && m > dyn && m - prevM >= 0.35 * base) {
+      state = 1; until = t + (mode === 'cal' ? 350 : 110);
+      h = { t: t, s: m, s0: m, pk: m, n: 0, v: [m], w: null, up: null, k: mode.charAt(0) }; open.push(h); lastH = h;
+      log.hits.push(h); if (log.hits.length > 600) log.hits.shift();
+      onHit(h);
+    } else {
+      if (m > base) { if (m <= floor) sup.zemin++; else if (m <= dyn) sup.yanki++; else sup.egim++; }
+      ema = ema * 0.97 + m * 0.03; bAcc += m * m;
+      if (++bN >= 120) { log.base.push(r1(Math.sqrt(bAcc / bN))); if (log.base.length > 120) log.base.shift(); bAcc = 0; bN = 0; }
+    }
+  } else if (t >= until && (m < base * 0.6 || t >= until + 250)) state = 0;
+  prevM = m;
+}
+function onHit(h) {
+  S.dHits++; S.dPow += Math.round(h.s);
+  if (mode === 'cal') calHit(h);
+  else if (mode === 'game') gameHit(h);
+  else if (mode === 'arc') arcHit(h);
+  else if (mode === 'free') freeHit(h);
+  else { // menüde: eşikleri kulakla ve gözle sınamak için
+    if (h.s0 >= S.pwi) fx('boom', 0.6); else fx('tom', vol(h.s0));
+    h.up = function () { if (h.s0 < S.pwi && h.s >= S.pw) fx('boom', 0.6); $('live').textContent = 'Son vuruş: ' + r1(h.s) + (strong(h) ? ' · SERT' : ' · normal') + ' (tepe ' + r1(h.pk) + ' m/s²)'; };
+  }
+}
+
+/* ---------- ayar: üç hafif, üç sert vuruş ---------- */
+var calS = null;
+function calStart() {
+  mode = 'cal'; calS = { step: -1, v: [[], []], q0: performance.now(), acc: 0, n: 0, tries: 0, thr: 4, base: 0.3, evt: performance.now(), hold: 0, k: 0 };
+  show('cal'); calText(); speak('Torbayı durdur ve bekle.');
+}
+function calText() {
+  var st = calS.step, n = st < 0 ? 0 : calS.v[st].length;
+  $('calBig').textContent = st < 0 ? 'Torbayı durdur' : st ? 'Üç SERT vuruş' : 'Üç hafif vuruş';
+  $('calDots').textContent = st < 0 ? '' : '●●●'.slice(0, n) + '○○○'.slice(0, 3 - n);
+  $('calSub').textContent = st < 0 ? 'İki saniye dokunmadan bekle.' : st ? 'Şimdi en sert vuruşlarını at.' : 'Torbaya hafifçe, tek tek vur. Vuruşlar arasında bir saniye bekle.';
+}
+function calTick(t, m) {
+  var c = calS; c.hold = Math.max(m, c.hold * 0.92);
+  if (++c.k % 3 === 0) $('calBar').style.width = Math.min(100, c.hold / 25 * 100) + '%';
+  if (c.step !== -1) return;
+  c.acc += m * m; c.n++;
+  if (t - c.q0 < 2000) return;
+  c.base = Math.sqrt(c.acc / c.n);
+  if (c.base > 1.2 && c.tries < 2) { c.tries++; c.acc = 0; c.n = 0; c.q0 = t; $('calSub').textContent = 'Torba hâlâ sallanıyor. Elinle durdur ve bekle.'; return; }
+  c.thr = Math.max(1.5, 4 * c.base); c.step = 0; c.evt = t; calText(); speak('Üç hafif vuruş yap.');
+}
+function calHit(h) {
+  var c = calS; c.evt = h.t; fx('tom', 0.8);
+  h.up = function () {
+    if (calS !== c) return;
+    c.v[c.step].push({ s: h.s, pk: h.pk });
+    if (c.v[c.step].length >= 3) { if (c.step === 0) { c.step = 1; speak('Şimdi üç sert vuruş.'); } else { calDone(); return; } }
+    calText();
+  };
+}
+function calDone() {
+  var mk = function (a, k) { return med(a.map(function (x) { return x[k]; })); }, c = calS;
+  var l = mk(c.v[0], 's'), hd = mk(c.v[1], 's'), lp0 = mk(c.v[0], 'pk'), hp0 = mk(c.v[1], 'pk'), near = hd < l * 1.3;
+  if (near) { hd = l * 1.6; hp0 = Math.max(hp0, lp0 * 1.6); }
+  S.light = r1(l); S.hard = r1(hd); S.lp = r1(lp0); S.hp = r1(hp0); S.base = r1(c.base);
+  S.thr = r1(Math.max(1.2, 0.4 * lp0, 3 * c.base)); S.pw = r1(l + 0.6 * (hd - l)); S.pwi = r1(lp0 + 0.75 * (hp0 - lp0)); S.cal = 1; S.arc = 0; save();
+  calS = null; mode = 'idle'; fx('boom', 0.7); speak('Hazır.');
+  toast(near ? 'Hafif ve sert vuruşların birbirine çok yakın çıktı; sert eşiğini menüden elle ayarlayabilirsin.' : 'Ayar tamam.');
+  if (!S.first) { S.first = 1; save(); startFree(true); } else { renderMenu(); show('menu'); }
+}
+$('calSkip').addEventListener('click', function () { calS = null; mode = 'idle'; S.cal = 1; S.first = 1; save(); renderMenu(); show('menu'); toast('Varsayılan ayarla devam. İstediğin zaman "Yeniden ayarla"ya bas.'); });
+setInterval(function () {
+  if (mode === 'cal' && calS && calS.step >= 0 && performance.now() - calS.evt > 8000) $('calSub').textContent = 'Vuruş algılanmadı. Biraz daha sert vur; olmuyorsa telefonu daha sıkı bağla ya da biraz aşağıya al.';
+}, 1000);
+
+/* ---------- oyun ---------- */
+var game = null, raf = 0, lastGame = null, cv = $('cv'), g2 = null, meter = { s: 0, at: 0 };
+try { g2 = cv.getContext('2d'); } catch (e) {}
+function size() { var r = window.devicePixelRatio || 1; cv.width = Math.round(cv.clientWidth * r) || 400; cv.height = Math.round(cv.clientHeight * r) || 700; }
+window.addEventListener('resize', size);
+function renderMenu() {
+  var d = new Date().toISOString().slice(0, 10); if (S.day !== d) { S.day = d; S.dHits = 0; S.dPow = 0; }
+  $('songs').innerHTML = SONGS.map(function (s, i) { var b = S.best[i + '-' + S.lvl]; return '<button data-i="' + i + '" class="' + (i === S.i ? 'sel' : '') + '" style="font-size:15px">' + s.n + (b ? '<br><small class="v">en iyi ' + b + '</small>' : '') + '</button>'; }).join('');
+  $('lvls').innerHTML = LV.map(function (n, i) { return '<button data-i="' + i + '" class="' + (i === S.lvl ? 'sel' : '') + '">' + n + '</button>'; }).join('');
+  $('thV').textContent = S.thr.toFixed(1); $('pwV').textContent = S.pw.toFixed(1); $('gd').textContent = S.guide ? 'Açık' : 'Kapalı';
+  var iv = deltas.length > 30 ? med(deltas) : 0; $('warn').textContent = iv > 30 ? 'Sensör yavaş çalışıyor (' + Math.round(iv) + ' ms). Düşük güç modunu kapat; zamanlama bozulabilir.' : '';
+  $('today').textContent = 'Bugün ' + S.dHits + ' vuruş · güç puanı ' + S.dPow + (S.arc ? ' · güç makinesi rekoru ' + S.arc : '');
+}
+$('songs').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { S.i = +b.getAttribute('data-i'); save(); renderMenu(); } });
+$('lvls').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { S.lvl = +b.getAttribute('data-i'); save(); renderMenu(); } });
+function adj(key, d, lo, hi) { S[key] = r1(Math.max(lo, Math.min(hi, S[key] + d))); save(); renderMenu(); }
+$('thM').addEventListener('click', function () { adj('thr', -0.5, 1, 60); }); $('thP').addEventListener('click', function () { adj('thr', 0.5, 1, 60); });
+function adjPw(d) { var o = S.pw; S.pw = r1(Math.max(1.5, Math.min(200, S.pw + d))); S.pwi = r1(S.pwi * S.pw / o); save(); renderMenu(); }
+$('pwM').addEventListener('click', function () { adjPw(-1); }); $('pwP').addEventListener('click', function () { adjPw(1); });
+function startGame() {
+  initAudio();
+  var ch = SONGS[S.i].build(S.lvl), need = S.lvl === 0 ? 5 : 3, ev = [], k;
+  var notes = ch.notes.map(function (n, i) { return { i: i, t: n.t, fq: n.fq, pow: n.p >= need, st: null, weak: false, dt: 0, h: null }; });
+  var t0 = performance.now() + 1200 + 4 * ch.beat, a0 = ac.currentTime + (t0 - performance.now()) / 1000;
+  // Sesler baştan topluca değil, çalınmadan 1,6 sn önce kurulur: zayıf telefonda takılma olmaz.
+  for (k = 4; k >= 1; k--) ev.push([-k * ch.beat / 1000, 'tick', 0.6]);
+  ch.grid.forEach(function (g) { ev.push([g[0] / 1000, ['kick', 'snare', 'hat'][g[1]], [0.5, 0.25, 0.1][g[1]]]); });
+  (ch.bass || []).forEach(function (g) { ev.push([g[0] / 1000, 'bass:' + g[1], 0.4]); });
+  // Ekrana bakmadan çalmak için: kısık zil notanın yerini, yükselen ses sert vuruşu haber verir.
+  if (S.guide) notes.forEach(function (n) { ev.push([n.t / 1000, 'bell:' + n.fq * 2, 0.1]); if (n.pow) ev.push([n.t / 1000 - ch.beat * 0.0009, 'rise', ch.beat * 0.0009]); });
+  ev.sort(function (p, q) { return p[0] - q[0]; });
+  game = { i: S.i, lvl: S.lvl, notes: notes, t0: t0, a0: a0, ev: ev, ei: 0, len: ch.len, beat: ch.beat, fx: [], pop: null, dts: [], hl: [], stray: 0, score: 0, combo: 0, maxCombo: 0, mult: 1, cnt: {}, done: false };
+  bg = ac.createGain(); bg.gain.value = 0.8; bg.connect(ac.destination);
+  $('hSong').textContent = SONGS[S.i].n + ' · ' + LV[S.lvl]; mode = 'game'; recalc(); show('stage');
+  cancelAnimationFrame(raf); raf = requestAnimationFrame(frame); tick();
+}
+function sched() {
+  if (!game.ev || !bg) return;
+  var lim = ac.currentTime + 1.6, e;
+  while (game.ei < game.ev.length && game.a0 + game.ev[game.ei][0] < lim) { e = game.ev[game.ei++]; if (e[1] === 'rise') rise(game.a0 + e[0], e[2], bg); else play(e[1], e[2], game.a0 + e[0], bg); }
+}
+function gameHit(h) {
+  var g = game, now = h.t, best = null, bd = 0;
+  g.notes.forEach(function (n) { if (n.st) return; var dt = now - (g.t0 + n.t) - S.bias; if (Math.abs(dt) <= WIN && (!best || Math.abs(dt) < Math.abs(bd))) { best = n; bd = dt; } });
+  g.hl.push(h); meter = { s: h.s0 * S.hard / S.hp, at: now };
+  if (!best) { g.stray++; fx('tom', vol(h.s0) * 0.7); h.up = function () { if (game === g) meter.s = h.s; }; recalc(); return; }
+  g.dts.push(bd); var a = g.dts.length >= 6 ? bd - med(g.dts) : bd;
+  best.h = h; best.dt = Math.round(a); best.st = Math.abs(a) <= PERF ? 'perfect' : 'good'; best.weak = best.pow && h.s0 < S.pwi;
+  play('pluck:' + best.fq, vol(h.s0)); if (best.pow && !best.weak) fx('boom', 0.8);
+  g.fx.push({ st: best.st, at: now, pow: best.pow && !best.weak });
+  g.pop = { k: best.weak ? 'weak' : best.pow ? 'pow' : best.st, at: now };
+  h.up = function () {
+    if (game !== g) return;
+    meter.s = h.s;
+    if (best.weak && h.s >= S.pw) { best.weak = false; fx('boom', 0.8); g.pop = { k: 'pow', at: performance.now() }; g.fx.push({ st: best.st, at: performance.now(), pow: true }); }
+    recalc();
+  };
+  recalc();
+}
+function recalc() {
+  var combo = 0, score = 0, mx = 0, c = { perfect: 0, good: 0, miss: 0, weak: 0, pow: 0, stray: game.stray || 0 };
+  game.notes.forEach(function (n) {
+    if (!n.st) return;
+    if (n.st === 'miss') { c.miss++; combo = 0; return; }
+    c[n.st]++; combo++; if (combo > mx) mx = combo;
+    var base = n.st === 'perfect' ? 100 : 60; if (n.pow) { if (n.weak) { base *= 0.5; c.weak++; } else { base *= 1.5; c.pow++; } }
+    score += Math.round(base * (1 + Math.min(3, Math.floor(combo / 8))) + Math.min(20, 20 * n.h.s / S.hard));
+  });
+  game.combo = combo; game.score = score; game.maxCombo = mx; game.cnt = c; game.mult = 1 + Math.min(3, Math.floor(combo / 8));
+  $('hScore').firstChild.nodeValue = score; $('hC').textContent = combo; $('hM').textContent = 'kombo · ×' + game.mult;
+}
+function tick() {
+  if (!game || game.done) return false;
+  sched();
+  var now = performance.now(), t = now - game.t0, ch = false;
+  game.notes.forEach(function (n) { if (!n.st && t > n.t + WIN + 40 + S.bias) { n.st = 'miss'; ch = true; game.pop = { k: 'miss', at: now }; } });
+  if (ch) recalc();
+  if (!game.free && t > game.len + 1500) { finish(false); return false; }
+  return true;
+}
+function frame() {
+  if (!tick()) return;
+  var now = performance.now(); draw(now, now - game.t0);
+  if (!game.free) $('prog').style.width = Math.max(0, Math.min(100, (now - game.t0) / game.len * 100)) + '%';
+  raf = requestAnimationFrame(frame);
+}
+setInterval(tick, 400);
+var POP = { perfect: ['MÜKEMMEL', '#3ddc97'], good: ['İYİ', '#ffb020'], weak: ['DAHA SERT!', '#ff6b6b'], pow: ['GÜM!', '#ff4d6d'], miss: ['KAÇTI', '#98a2ab'] };
+function draw(now, t) {
+  var g = g2; if (!g) return;
+  var W = cv.width, H = cv.height, cx = W / 2, hy = H * 0.74, LA = 2000, F = 'px system-ui,-apple-system,"Segoe UI",sans-serif', rn = W * 0.1, rp = W * 0.17;
+  g.clearRect(0, 0, W, H); g.textAlign = 'center'; g.textBaseline = 'middle';
+  var fl = game.fx.length ? game.fx[game.fx.length - 1] : null;
+  if (fl && fl.pow && now - fl.at < 180) { g.fillStyle = 'rgba(255,77,109,' + (0.28 * (1 - (now - fl.at) / 180)) + ')'; g.fillRect(0, 0, W, H); }
+  if (game.arc) { drawArc(g, now, W, H, F); return; }
+  g.fillStyle = 'rgba(255,255,255,.05)'; g.fillRect(cx - rp * 1.15, 0, rp * 2.3, H);
+  var ph = ((t % game.beat) + game.beat) % game.beat / game.beat;
+  g.strokeStyle = '#f2f4f5'; g.lineWidth = Math.max(4, W * 0.012); g.globalAlpha = 0.95 - 0.5 * ph; g.beginPath(); g.arc(cx, hy, rp * 1.05, 0, 6.283); g.stroke(); g.globalAlpha = 1;
+  if (game.free) {
+    g.fillStyle = '#f2f4f5'; g.font = '800 ' + Math.round(W * 0.2) + F; g.fillText(game.n, cx, H * 0.36);
+    g.fillStyle = '#98a2ab'; g.font = '500 ' + Math.round(W * 0.045) + F; g.fillText(game.intro ? 'Vur! Her vuruş bir nota' : 'vuruş · şarkı senin hızında', cx, H * 0.36 + W * 0.15);
+    if (game.intro) { g.fillStyle = '#ffb020'; g.fillRect(W * 0.15, H * 0.5, W * 0.7 * Math.min(1, game.n / game.seq.length), W * 0.02); g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(W * 0.15 + W * 0.7 * Math.min(1, game.n / game.seq.length), H * 0.5, W * 0.7 * (1 - Math.min(1, game.n / game.seq.length)), W * 0.02); }
+  } else game.notes.forEach(function (n) {
+    var dt = n.t - t; if (dt > LA || dt < -500 || (n.st && n.st !== 'miss')) return;
+    var y = hy - dt / LA * hy, r = n.pow ? rp : rn;
+    g.globalAlpha = n.st ? 0.2 : 1; g.fillStyle = n.pow ? '#ff4d6d' : '#3da5ff'; g.beginPath(); g.arc(cx, y, r, 0, 6.283); g.fill();
+    if (n.pow) { g.strokeStyle = '#ffb020'; g.lineWidth = W * 0.012; g.stroke(); g.fillStyle = '#fff'; g.font = '800 ' + Math.round(r * 0.5) + F; g.fillText('SERT', cx, y); }
+    g.globalAlpha = 1;
+  });
+  game.fx = game.fx.filter(function (f) { return now - f.at < 420; });
+  game.fx.forEach(function (f) { var a = (now - f.at) / 420; g.globalAlpha = 1 - a; g.strokeStyle = f.pow ? '#ff4d6d' : POP[f.st][1]; g.lineWidth = W * 0.03 * (1 - a) + 2; g.beginPath(); g.arc(cx, hy, rp * (1 + 0.9 * a), 0, 6.283); g.stroke(); g.globalAlpha = 1; });
+  if (game.pop && now - game.pop.at < 600) { var pa = (now - game.pop.at) / 600; g.globalAlpha = 1 - pa; g.fillStyle = POP[game.pop.k][1]; g.font = '800 ' + Math.round(W * 0.11) + F; g.fillText(POP[game.pop.k][0], cx, H * 0.3 - pa * H * 0.03); g.globalAlpha = 1; }
+  if (!game.free && t < 0) { g.fillStyle = '#fff'; g.font = '800 ' + Math.round(W * 0.4) + F; g.fillText(Math.min(4, Math.ceil(-t / game.beat)), cx, H * 0.4); g.font = '600 ' + Math.round(W * 0.05) + F; g.fillStyle = '#3da5ff'; g.fillText('Mavi nota: vur', cx, H * 0.56); g.fillStyle = '#ff4d6d'; g.fillText('Kırmızı büyük nota: SERT vur', cx, H * 0.56 + W * 0.075); }
+  // güç göstergesi: son vuruşun şiddeti, çizgi sert eşiği
+  var bx = W * 0.9, bh = H * 0.42, by = hy + rp, lv = Math.min(1, meter.s / (S.hard * 1.15)) * Math.max(0, 1 - (now - meter.at) / 900), pl = Math.min(1, S.pw / (S.hard * 1.15));
+  g.fillStyle = 'rgba(255,255,255,.08)'; g.fillRect(bx - W * 0.025, by - bh, W * 0.05, bh);
+  g.fillStyle = meter.s >= S.pw ? '#ff4d6d' : '#3da5ff'; g.fillRect(bx - W * 0.025, by - bh * lv, W * 0.05, bh * lv);
+  g.fillStyle = '#ffb020'; g.fillRect(bx - W * 0.04, by - bh * pl - 2, W * 0.08, 4);
+  g.fillStyle = '#98a2ab'; g.font = '600 ' + Math.round(W * 0.035) + F; g.fillText('GÜÇ', bx, by + W * 0.04);
+}
+function stopAudio() { if (bg) { try { bg.gain.value = 0; bg.disconnect(); } catch (e) {} bg = null; } }
+function fit(hl, ms) {
+  var s = hl.map(function (h) { return h.s; }), sum = s.reduce(function (a, b) { return a + b; }, 0);
+  return { n: s.length, avg: s.length ? Math.round(sum / s.length / S.hard * 100) : 0, max: s.length ? r1(Math.max.apply(null, hl.map(function (h) { return h.pk; }))) : 0, hard: hl.filter(strong).length, pm: ms > 5000 ? Math.round(s.length / (ms / 60000)) : 0, pts: Math.round(sum) };
+}
+function finish(aborted) {
+  if (!game) return; cancelAnimationFrame(raf); stopAudio(); mode = 'idle'; save();
+  if (aborted) { game = null; renderMenu(); show('menu'); return; }
+  game.done = true; recalc();
+  var N = game.notes.length, c = game.cnt, hit = c.perfect + c.good, ratio = (c.perfect + 0.6 * c.good - 0.3 * c.weak - 0.15 * Math.min(c.stray, N)) / N;
+  var stars = ratio >= 0.93 ? 5 : ratio >= 0.82 ? 4 : ratio >= 0.65 ? 3 : ratio >= 0.45 ? 2 : hit ? 1 : 0, f = fit(game.hl, game.len);
+  if (game.dts.length >= 6) S.bias = Math.round(S.bias + med(game.dts));
+  var key = game.i + '-' + game.lvl, rec = game.score > 0 && !(S.best[key] >= game.score); if (rec) S.best[key] = game.score; save();
+  lastGame = { song: SONGS[game.i].n, lvl: LV[game.lvl], score: game.score, stars: stars, acc: Math.round(hit / N * 100), combo: game.maxCombo, pow: f.avg + '%', cnt: c, n: N, fit: f, bias: S.bias, rec: rec };
+  log.games.push(lastGame); if (log.games.length > 20) log.games.shift();
+  $('stars').textContent = '★★★★★'.slice(0, stars) + '☆☆☆☆☆'.slice(0, 5 - stars);
+  $('rScore').textContent = game.score; $('rSong').textContent = lastGame.song + ' · ' + lastGame.lvl + (rec ? ' · yeni rekor' : '');
+  $('rStats').innerHTML = [['İsabet', '%' + lastGame.acc], ['Mükemmel / iyi / kaçan', c.perfect + ' / ' + c.good + ' / ' + c.miss], ['Sert notalar', c.pow + ' / ' + (c.pow + c.weak) + ' tam güçle'], ['En uzun kombo', game.maxCombo],
+    ['Toplam vuruş', f.n + (f.pm ? ' · dakikada ' + f.pm : '') + (c.stray ? ' · ' + c.stray + ' boşa' : '')], ['Ortalama güç', '%' + f.avg + ' (kendi sert vuruşuna göre)'], ['En sert vuruş', f.max + ' m/s²'], ['Güç puanı', f.pts]]
+    .map(function (r) { return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('');
+  play('bell:880', 0.5); show('result');
+}
+/* serbest çal: her vuruş şarkının sıradaki notası */
+function startFree(intro) {
+  initAudio(); var ch = SONGS[intro === true ? 0 : S.i].build(0);
+  game = { free: true, intro: intro === true, i: S.i, notes: [], seq: ch.notes, n: 0, t0: performance.now(), beat: 600, len: 1, fx: [], pop: null, hl: [], done: false };
+  mode = 'free'; $('hSong').textContent = SONGS[intro === true ? 0 : S.i].n + ' · serbest'; $('hScore').firstChild.nodeValue = ''; $('hC').textContent = ''; $('hM').textContent = ''; $('prog').style.width = '0';
+  show('stage'); cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
+  if (game.intro) speak('Şimdi vur. Her vuruş bir nota.');
+}
+function freeHit(h) {
+  var g = game, n = g.seq[g.n % g.seq.length], st = h.s0 >= S.pwi; g.n++; g.hl.push(h); meter = { s: h.s0 * S.hard / S.hp, at: h.t };
+  play('pluck:' + n.fq, vol(h.s0)); if (st) fx('boom', 0.6);
+  g.fx.push({ st: 'perfect', at: h.t, pow: st }); if (st) g.pop = { k: 'pow', at: h.t };
+  h.up = function () { if (game !== g) return; meter.s = h.s; if (!st && h.s >= S.pw) { st = true; fx('boom', 0.6); g.pop = { k: 'pow', at: performance.now() }; } };
+  // İlk açılış: şarkı bir kez baştan sona çalınınca menüye geçilir.
+  if (g.intro && g.n >= g.seq.length) setTimeout(function () { if (game !== g) return; finish(true); fx('boom', 0.7); toast('Şarkıyı sen çaldın! Şimdi ritimle dene: OYNA'); }, 700);
+}
+/* güç makinesi: jetonlu boks makinesi gibi. Üç hak, her hakta tek yumruk, 0-999 puan. Ayarı yapanın sert vuruşu 600 eder. */
+var RANK = [[850, 'EFSANE', '#ff4d6d'], [700, 'ÇOK GÜÇLÜ', '#ffb020'], [500, 'GÜÇLÜ', '#3ddc97'], [300, 'İYİ', '#3da5ff'], [0, 'ISINMA', '#98a2ab']];
+function rank(v) { for (var i = 0; i < RANK.length; i++) if (v >= RANK[i][0]) return RANK[i]; }
+function beep(f, d) { if (!ac) return; var o = ac.createGain(); o.gain.value = 0.5; o.connect(ac.destination); tone('square', f, 0, d, 0.5, ac.currentTime, o); }
+function startArc() {
+  initAudio();
+  game = { arc: true, free: true, notes: [], t0: performance.now(), beat: 600, len: 1, fx: [], pop: null, hl: [], done: false, turns: 3, sc: [], ph: 'ready', pt: performance.now(), cur: 0, dur: 1, rec: false };
+  mode = 'arc'; $('hSong').textContent = ''; $('hScore').firstChild.nodeValue = ''; $('hC').textContent = ''; $('hM').textContent = ''; $('prog').style.width = '0';
+  show('stage'); cancelAnimationFrame(raf); raf = requestAnimationFrame(frame); arcReady(game, 1600);
+}
+function arcReady(g, wait) {
+  g.ph = 'ready'; g.pt = performance.now(); g.rec = false;
+  setTimeout(function () { if (game !== g || g.ph !== 'ready') return; g.ph = 'go'; g.pt = performance.now(); beep(880, 0.25); speak('Vur!'); }, wait);
+}
+function arcHit(h) {
+  var g = game;
+  if (g.ph === 'end') { if (performance.now() - g.pt > 1500) { g.sc = []; fx('tom', 0.8); arcReady(g, 1200); } return; }
+  if (g.ph !== 'go') return;   // sayı dönerken ya da hazırlanırken gelen vuruş sayılmaz
+  g.ph = 'meas'; fx('boom', 1); g.hl.push(h); g.fx.push({ st: 'perfect', at: h.t, pow: true });
+  h.up = function () {
+    if (game !== g) return;
+    var v = Math.max(1, Math.min(999, Math.round(600 * (0.7 * h.s / S.hard + 0.3 * h.pk / S.hp)))), dur = 700 + v, n = Math.floor(dur / 55), i, o = ac.createGain(), t = ac.currentTime;
+    o.gain.value = 0.25; o.connect(ac.destination);
+    for (i = 0; i < n; i++) tone('square', 250 + v * 1.6 * i / n, 0, 0.04, 0.5, t + i * 0.055, o);
+    g.cur = v; g.ph = 'roll'; g.pt = performance.now(); g.dur = dur; g.sc.push(v);
+    log.arc.push([v, r1(h.s), r1(h.pk)]); if (log.arc.length > 60) log.arc.shift();
+    setTimeout(function () {
+      if (game !== g) return;
+      play('bell:' + (v >= 700 ? 1320 : 880), 0.6);
+      if (v > (S.arc || 0)) { S.arc = v; g.rec = true; save(); fx('boom', 0.9); speak('Yeni rekor!'); }
+      g.ph = 'show'; g.pt = performance.now();
+      setTimeout(function () {
+        if (game !== g) return;
+        if (g.sc.length < g.turns) arcReady(g, 900);
+        else { g.ph = 'end'; g.pt = performance.now(); g.cur = Math.max.apply(null, g.sc); speak('En iyi ' + g.cur); }
+      }, 1700);
+    }, dur);
+  };
+}
+function drawArc(g, now, W, H, F) {
+  var a = game, cx = W / 2, el = now - a.pt, i, shown, rk;
+  g.fillStyle = '#98a2ab'; g.font = '700 ' + Math.round(W * 0.05) + F; g.fillText('GÜÇ MAKİNESİ', cx, H * 0.1);
+  g.font = '600 ' + Math.round(W * 0.045) + F; g.fillText('Rekor ' + (S.arc || 0), cx, H * 0.15);
+  for (i = 0; i < a.turns; i++) { g.fillStyle = i < a.sc.length ? '#ffb020' : 'rgba(255,255,255,.18)'; g.beginPath(); g.arc(cx + (i - (a.turns - 1) / 2) * W * 0.09, H * 0.22, W * 0.022, 0, 6.283); g.fill(); }
+  if (a.ph === 'ready') {
+    g.fillStyle = '#f2f4f5'; g.font = '800 ' + Math.round(W * 0.12) + F; g.fillText('HAZIRLAN', cx, H * 0.45);
+    g.fillStyle = '#98a2ab'; g.font = '500 ' + Math.round(W * 0.05) + F; g.fillText((a.sc.length + 1) + '. hak · tek yumruk, en sert', cx, H * 0.45 + W * 0.13);
+  } else if (a.ph === 'go' || a.ph === 'meas') {
+    g.fillStyle = 'rgba(255,77,109,' + (0.75 + 0.25 * Math.abs(Math.sin(now / 160))) + ')'; g.font = '800 ' + Math.round(W * 0.34) + F; g.fillText('VUR!', cx, H * 0.45);
+  } else {
+    shown = a.ph === 'roll' ? Math.round(a.cur * Math.min(1, el / a.dur)) : a.cur; rk = rank(shown);
+    g.fillStyle = rk[2]; g.font = '800 ' + Math.round(W * 0.4) + F; g.fillText(shown, cx, H * 0.42);
+    if (a.ph !== 'roll') {
+      g.font = '800 ' + Math.round(W * 0.09) + F; g.fillText(a.ph === 'end' ? 'EN İYİ · ' + rk[1] : rk[1], cx, H * 0.42 + W * 0.3);
+      if (a.rec && a.ph === 'show') { g.fillStyle = '#ffb020'; g.fillText('YENİ REKOR!', cx, H * 0.42 + W * 0.43); }
+    }
+    if (a.ph === 'end') { g.fillStyle = '#98a2ab'; g.font = '500 ' + Math.round(W * 0.045) + F; g.fillText(a.sc.join(' · '), cx, H * 0.42 + W * 0.43); g.fillText('Tekrar için torbaya vur', cx, H * 0.42 + W * 0.53); }
+  }
+}
+function card() {
+  var c = document.createElement('canvas'); c.width = 1080; c.height = 1080; var g = c.getContext('2d'), r = lastGame;
+  var gr = g.createLinearGradient(0, 0, 1080, 1080); gr.addColorStop(0, '#1b0d14'); gr.addColorStop(0.5, '#0b0d10'); gr.addColorStop(1, '#0a1622'); g.fillStyle = gr; g.fillRect(0, 0, 1080, 1080);
+  g.fillStyle = '#ff4d6d'; g.fillRect(0, 0, 14, 1080); g.fillStyle = '#3da5ff'; g.fillRect(1066, 0, 14, 1080);
+  g.textAlign = 'center'; g.fillStyle = '#f2f4f5'; g.font = '800 64px system-ui,sans-serif'; g.fillText('VURUŞ', 540, 130);
+  g.fillStyle = '#98a2ab'; g.font = '500 40px system-ui,sans-serif'; g.fillText(r.song + ' · ' + r.lvl, 540, 200);
+  g.fillStyle = '#ffb020'; g.font = '800 120px system-ui,sans-serif'; g.fillText('★★★★★'.slice(0, r.stars) + '☆☆☆☆☆'.slice(0, 5 - r.stars), 540, 400);
+  g.fillStyle = '#fff'; g.font = '800 220px system-ui,sans-serif'; g.fillText(r.score, 540, 640);
+  g.fillStyle = '#98a2ab'; g.font = '500 44px system-ui,sans-serif'; g.fillText('isabet %' + r.acc + '  ·  kombo ' + r.combo + (r.pow ? '  ·  güç ' + r.pow : ''), 540, 760);
+  g.fillStyle = '#f2f4f5'; g.font = '700 48px system-ui,sans-serif'; g.fillText('Bu şarkıyı yumruklarımla çaldım.', 540, 930);
+  return c;
+}
+$('share').addEventListener('click', function () {
+  card().toBlob(function (b) {
+    var f = new File([b], 'vurus-skor.png', { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [f] })) navigator.share({ files: [f], text: lastGame.song + ': ' + lastGame.score + ' puan' }).catch(function () {});
+    else { var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'vurus-skor.png'; a.click(); toast('Skor kartı indirildi.'); }
+  });
+});
+
+$('go').addEventListener('click', startGame); $('again').addEventListener('click', startGame); $('free').addEventListener('click', startFree);
+$('back').addEventListener('click', function () { renderMenu(); show('menu'); });
+// Durdurma basılı tutmayla: torbadaki telefona kazara dokunuş oyunu kesmesin.
+var qT = 0;
+function doQuit() {
+  $('quit').textContent = 'DURDUR · basılı tut';
+  if (game && game.arc) { var b = game.sc.length ? Math.max.apply(null, game.sc) : 0; finish(true); if (b) toast('Güç makinesi: en iyi ' + b + ' · rekor ' + (S.arc || 0)); }
+  else if (game && game.free) { var f = fit(game.hl, performance.now() - game.t0); finish(true); toast(f.n + ' vuruş · ortalama güç %' + f.avg + (f.pm ? ' · dakikada ' + f.pm : '')); } else finish(true);
+}
+$('quit').addEventListener('pointerdown', function (e) { e.preventDefault(); $('quit').textContent = 'Basılı tut…'; clearTimeout(qT); qT = setTimeout(doQuit, 700); });
+['pointerup', 'pointerleave', 'pointercancel'].forEach(function (n) { $('quit').addEventListener(n, function () { clearTimeout(qT); $('quit').textContent = 'DURDUR · basılı tut'; }); });
+$('recal').addEventListener('click', calStart); $('arc').addEventListener('click', startArc);
+$('gd').addEventListener('click', function () { S.guide = S.guide ? 0 : 1; save(); renderMenu(); });
+function dataObj() {
+  return { ver: VER, ua: navigator.userAgent.replace(/^.*?\((.*?)\).*$/, '$1'), int: r1(med(deltas)), maxM: r1(maxM), sup: sup,
+    set: { thr: S.thr, pw: S.pw, pwi: S.pwi, light: S.light, hard: S.hard, lp: S.lp, hp: S.hp, base: S.base, bias: S.bias, guide: S.guide }, base: log.base, games: log.games, arc: log.arc,
+    hits: log.hits.map(function (h) { return [h.k, Math.round(h.t), r1(h.s0), r1(h.s), r1(h.pk)]; }), win: log.hits.filter(function (h) { return h.w; }).slice(-40).map(function (h) { return h.w; }) };
+}
+$('rep').addEventListener('click', function () {
+  var d = dataObj(), J = JSON.stringify, txt = 'Vuruş ' + d.ver + ' raporu\n' +
+    'cihaz: ' + d.ua + ' | sensör aralığı: ' + d.int + ' ms | en büyük ölçüm: ' + d.maxM + ' m/s²\n' +
+    'ayar: ' + J(d.set) + '\n' +
+    'bastırılan tetikleme [eğim, yankı, zemin]: ' + J(d.sup) + ' | zemin rms (son 20): ' + J(d.base.slice(-20)) + '\n' +
+    'oyunlar (son 5): ' + J(d.games.slice(-5)) + '\n' +
+    'güç makinesi [puan, şiddet, tepe]: ' + J(d.arc) + '\n' +
+    'vuruşlar (son 200) [mod, ms, anlık, şiddet, tepe]: ' + J(d.hits.slice(-200)) + '\n' +
+    'pencereler (son 40 vuruş, 6 örnek önce + 17 sonra): ' + J(d.win);
+  var ta = $('out'); ta.value = txt; ta.style.display = 'block';
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(function () { toast('Kopyalandı. Sohbete yapıştır.'); }).catch(function () { ta.select(); toast('Aşağıdaki metni elle kopyala.'); });
+  else { ta.select(); toast('Aşağıdaki metni elle kopyala.'); }
+});
+$('data').addEventListener('click', function () {
+  var b = new Blob([JSON.stringify(dataObj())], { type: 'application/json' }), f = new File([b], 'vurus-torba-veri.json', { type: 'application/json' });
+  if (navigator.canShare && navigator.canShare({ files: [f] })) navigator.share({ files: [f] }).catch(function () {});
+  else { var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = f.name; a.click(); toast('Veri dosyası indirildi.'); }
+});
+var wl = null;
+function wake() { try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (l) { wl = l; }).catch(function () {}); } catch (e) {} }
+document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && running) { wake(); try { if (ac) ac.resume(); } catch (e) {} } });
+function begin() {
+  window.addEventListener('devicemotion', onMotion); running = true; wake(); if (S.cal) { renderMenu(); show('menu'); } else calStart();
+  setTimeout(function () { if (!last) { var t = 'Sensörden veri gelmiyor. Sayfayı yenile ve hareket sensörü iznini ver.'; $('calSub').textContent = t; $('warn').textContent = t; } }, 2500);
+}
+$('start').addEventListener('click', function () {
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+  initAudio();
+  if (!window.isSecureContext) { $('msg').textContent = 'Sensör için sayfa https ile açılmalı.'; return; }
+  if (typeof DeviceMotionEvent === 'undefined') { $('msg').textContent = 'Bu cihazda hareket sensörü yok.'; return; }
+  if (typeof DeviceMotionEvent.requestPermission === 'function') {
+    DeviceMotionEvent.requestPermission().then(function (r) { if (r === 'granted') begin(); else $('msg').textContent = 'Sensör izni verilmedi. Sayfayı yenileyip izin ver.'; }).catch(function () { $('msg').textContent = 'Sensör izni alınamadı.'; });
+  } else begin();
+});
+</script>
+</body>
+</html>
