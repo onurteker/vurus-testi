@@ -46,7 +46,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 </head>
 <body>
 <div class="scr on" id="home">
-  <h1>Vuruş</h1><small class="v">Torba · v1.3.1</small>
+  <h1>Vuruş</h1><small class="v">Torba · v1.4.0</small>
   <p style="margin-top:16px"><b>Torbaya vur, şarkıyı sen çal.</b> Her vuruş melodinin bir notası; ne kadar sert vurursan o kadar güçlü çalar.</p>
   <div class="box"><b>Kurulum</b><p>1. Telefonu torbanın <b>en üst kısmına</b>, vuruş bölgesinin dışına, ekranı sana bakacak şekilde <b>sıkıca</b> bağla. Torbanın en az sallanan yeri üstüdür. Gevşek kayış yanlış sayar.<br>2. Sesi sonuna kadar aç, sessiz modu kapat.<br>3. BAŞLA'ya bas, sensör iznini ver.</p></div>
   <button id="start" class="big primary">BAŞLA</button>
@@ -89,6 +89,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
     <div class="row"><span>Klip kaydı <small class="v">deneme</small></span><span><button id="clipM" style="padding:4px 12px"></button></span></div>
     <div class="row"><span>Saklanan denemeler <small class="v" id="sessN"></small></span><span><button id="sessAll" style="padding:4px 12px">Hepsini kopyala</button></span></div>
     <div class="row"><span>Geliştirici testi <small class="v">1 dk</small></span><span><button id="devBtn" style="padding:4px 12px">Başlat</button></span></div>
+    <div class="row"><span>Mikrofonla ölç <small class="v">deneysel</small></span><span><button id="micB" style="padding:4px 12px">Aç</button></span></div>
     <div class="row"><span>Ses</span><span><button id="sndT2" style="padding:4px 12px">Ses testi</button></span></div>
     <div class="row"><span>Torba ayarı</span><span><button id="recal" style="padding:4px 12px">Yeniden ayarla</button></span></div>
     <p style="margin:4px 0 0;font-size:14px">Vurmadan ses çıkıyorsa vuruş eşiğini büyüt; hafif vuruşlar kaçıyorsa küçült.</p>
@@ -120,7 +121,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 <script>
 'use strict';
 var $ = function (id) { return document.getElementById(id); };
-var VER = 'torba-1.3.1', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
+var VER = 'torba-1.4.0', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
 function pn(n) { return { h: n % 2 ? 'L' : 'R', ty: Math.floor((n - 1) / 2) }; }
 function med(a) { if (!a.length) return 0; var s = a.slice().sort(function (p, q) { return p - q; }); return s[Math.floor(s.length / 2)]; }
 function r1(v) { return Math.round(v * 10) / 10; }
@@ -239,7 +240,8 @@ function limCheck() {
   } catch (e) { limSeen = 1; limBusy = 0; }
 }
 function initAudio() {
-  if (ac) { ac.resume(); return; }
+  if (ac) { ac.resume(); smpLoad(); return; }
+  setTimeout(function () { smpLoad(); }, 0);
   var AC = window.AudioContext || window.webkitAudioContext; ac = new AC({ latencyHint: 'interactive' });
   var len = Math.floor(ac.sampleRate * 0.5); noise = ac.createBuffer(1, len, ac.sampleRate);
   var d = noise.getChannelData(0); for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
@@ -335,6 +337,7 @@ function onMotion(e) {
   prevM = m;
 }
 function onHit(h) {
+  micTag(h);
   S.dHits++; S.dPow += Math.round(h.s); if (mode !== 'cal') quest('hits', S.dHits);
   if (mode === 'cal') calHit(h);
   else if (mode === 'game') gameHit(h);
@@ -414,7 +417,7 @@ function renderMenu() {
   $('rdN').textContent = S.rd.n + ' raund'; $('rdW').textContent = 'süre ' + mmss(S.rd.w); $('rdR').textContent = 'dinlenme ' + mmss(S.rd.r);
   $('rdInfo').textContent = S.rd.n + ' × ' + mmss(S.rd.w) + ' · dinlenme ' + mmss(S.rd.r);
   $('clipM').textContent = CLIP[S.clip || 0]; clipBtns();
-  $('devCard').style.display = S.dev ? 'none' : 'block'; $('sessN').textContent = sess.length + ' kayıt';
+  $('devCard').style.display = S.dev ? 'none' : 'block'; $('micB').textContent = MIC.on ? 'Kapat' : 'Aç'; $('sessN').textContent = sess.length + ' kayıt';
   $('rep').textContent = 'Raporu kopyala' + (unsent().length ? ' · ' + unsent().length + ' yeni deneme' : '');
 }
 $('songs').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) { S.i = +b.getAttribute('data-i'); save(); renderMenu(); } });
@@ -599,7 +602,7 @@ function logSession(m, sum, t0) {
   try {
     var hs = log.hits.filter(function (h) { return h.t >= t0; }), wins = hs.filter(function (h) { return h.w; });
     sess.push({ at: new Date().toISOString().slice(0, 19), v: VER, m: m, snd: ac ? ac.state : 'yok', set: [S.thr, S.pw, S.pwi, S.light, S.hard, S.lp, S.hp, S.base], sum: sum, sup: [sup.egim, sup.yanki, sup.zemin],
-      hits: hs.slice(-250).map(function (h) { return [Math.round(h.t - t0), r1(h.s0), r1(h.s), Math.round(h.pk)]; }), win: (wins.length > 8 ? wins.slice(0, 4).concat(wins.slice(-4)) : wins).map(function (h) { return h.w; }), sent: 0 });
+      hits: hs.slice(-250).map(function (h) { var r = [Math.round(h.t - t0), r1(h.s0), r1(h.s), Math.round(h.pk)]; if (h.mic) r.push(h.mic); return r; }), mic: MIC.on ? 1 : 0, win: (wins.length > 8 ? wins.slice(0, 4).concat(wins.slice(-4)) : wins).map(function (h) { return h.w; }), sent: 0 });
     while (sess.length > 80) sess.shift();
     localStorage.setItem(LOGKEY, JSON.stringify(sess));
   } catch (e) {}
@@ -618,7 +621,7 @@ function sessLine(x) {   // kurulum ve ayar denemeleri tam; ötekiler özet + il
   var full = /^(geliştirici|ayar)/.test(x.m), H = x.hits || [], W = x.win || [], iv = [], i, c = function (k) { return H.map(function (h) { return h[k]; }); };
   for (i = 1; i < H.length; i++) iv.push(H[i][0] - H[i - 1][0]);
   return JSON.stringify([x.at.slice(5), x.m, x.snd, x.set, x.sum, x.sup, H.length,
-    full ? H : { s0: qs(c(1)), s: qs(c(2)), pk: qs(c(3)), ara: qs(iv), kisa: iv.filter(function (v) { return v < 160; }).length, ilk: H.slice(0, 60).map(function (h) { return [Math.round(h[0] / 10), Math.round(h[1]), Math.round(h[2]), h[3]]; }) },
+    full ? H : { s0: qs(c(1)), s: qs(c(2)), pk: qs(c(3)), ara: qs(iv), kisa: iv.filter(function (v) { return v < 160; }).length, ilk: H.slice(0, 60).map(function (h) { var r = [Math.round(h[0] / 10), Math.round(h[1]), Math.round(h[2]), h[3]]; if (h[4]) r.push(h[4][0], h[4][1]); return r; }), mik: H.filter(function (h) { return h[4]; }).length ? { bulunan: H.filter(function (h) { return h[4] && h[4][0] !== null; }).length + '/' + H.filter(function (h) { return h[4]; }).length, dt: qs(H.filter(function (h) { return h[4] && h[4][0] !== null; }).map(function (h) { return h[4][0]; })) } : 0 },
     full || W.length <= 2 ? W : [W[0], W[W.length - 1]]]);
 }
 function sessText(all) {   // all: daha önce kopyalananlar dahil saklanan bütün denemeler
@@ -730,7 +733,7 @@ function layer(n, from, to, burst, v) {
 function bgSet(v) {   // müzik yolunun sesi; planlanmış geri çekilmeyi de siler
   if (!bg) return; try { bg.gain.cancelScheduledValues(ac.currentTime); bg.gain.setValueAtTime(v, ac.currentTime); } catch (e) {} bg.gain.value = v;
 }
-function rdVol(g) { return g.rd.ph !== 'work' ? 0.3 : g.lv === 3 ? 0.9 : 0.7; }   // müzik yolunun olması gereken sesi
+function rdVol(g) { return !g.rd ? 0.8 : g.rd.ph !== 'work' ? 0.3 : g.lv === 3 ? 0.9 : 0.7; }   // müzik yolunun olması gereken sesi
 function duck(tier) {   // her yumrukta müzik bir an geri çekilir (sertte daha çok): yumruk öne çıkar, müzik onunla "nefes alır"
   if (!bg || !game || !game.bgm) return;
   var t = ac.currentTime, v = rdVol(game); try { bg.gain.cancelScheduledValues(t); bg.gain.setValueAtTime(v * [0.72, 0.58, 0.45][tier], t); bg.gain.linearRampToValueAtTime(v, t + 0.17); } catch (e) {}
@@ -795,11 +798,13 @@ function enHit(g, h) {
 
 /* ---------- serbest çal: her vuruş şarkının sıradaki notası, şarkı oyuncunun hızında ilerler ---------- */
 function startFree(intro) {
-  initAudio(); intro = intro === true; var si = intro ? 0 : S.i;
+  initAudio(); intro = intro === true; var si = intro ? 0 : S.i, TT = SONGS[si].trk;
+  if (TT && !(TB && TB.f === TT.f)) { trkLoad(TT, function (ok) { if (!ok) { S.i = KFIRST; save(); } startFree(intro); }); return; }
   game = { free: true, intro: intro, i: si, notes: [], seq: seqOf(si), n: 0, t0: performance.now(), beat: 600, len: 1, fx: [], pop: null, hl: [], done: false, en: enNew() };
   newBus(); mode = 'free'; hud(SONGS[si].n + ' · serbest'); lastStart = startFree;
+  if (TT) { game.trk = TT; trkFree(game, performance.now()); }
   show('stage'); cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
-  if (intro) speak('Şimdi vur. Her vuruş bir nota.'); else { speak('Düzenli vur, grup sana katılsın.'); recStart(); }
+  if (intro) speak('Şimdi vur. Her vuruş bir nota.'); else { speak(TT ? 'Vur, şarkıyı sen aç.' : 'Düzenli vur, grup sana katılsın.'); recStart(); }
 }
 function freeHit(h) {
   var g = game; enHit(g, h);
@@ -1311,7 +1316,8 @@ $('sessAll').addEventListener('click', function () {
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(function () { toast('Kopyalandı. Sohbete yapıştır.'); }).catch(function () { ta.select(); toast('Aşağıdaki metni elle kopyala.'); });
   else { ta.select(); toast('Aşağıdaki metni elle kopyala.'); }
 });
-$('devBtn').addEventListener('click', devStart); $('devCardGo').addEventListener('click', devStart);
+$('devBtn').addEventListener('click', devStart);
+$('micB').addEventListener('click', function () { if (MIC.on) micStop(); else micStart(); }); $('devCardGo').addEventListener('click', devStart);
 /* ---------- kombo parçaları: boks ritmine göre yazılmış özgün parçalar ----------
    Her ölçü dört vuruştur ve iki yarıdan oluşur:
    ilk yarı CEVAP: oyuncu komboyu sekizlik notalarla atar (bir-iki = iki sekizlik); yumruklar o ölçünün akorunu aşağıdan yukarı çalar.
@@ -1413,8 +1419,8 @@ function drawCall(g, now, t, W, H, F) {   // sıradaki / şimdiki kombo: büyük
    sakin yerde kısa/seyrek, yükselen yerde uzun kombo; parçanın en güçlü yerlerinde son yumruk SERT.
    Yumruk sesi bir davul seti gibidir (parçanın tonuyla çatışmaz): hafif = trampet, orta = + bas davul, sert = + gümbürtü ve zil. */
 var TSHA = '655388f987eacf6d08d73080fcc3e727f267bfde';
-var TRACKS = [{"n":"Hit n Smash","g":"Elektro rock","f":"freepd.com/Hit n Smash.mp3","per":0.461538,"ph":0.053,"nb":288,"down":1,"dur":133.02,"lv":[9,9,0,0,0,0,2,4,4,4,2,2,3,4,3,3,1,0,0,0,2,4,8,8,7,5,1,1,3,3,3,3,0,0,0,0,2,4,8,8,8,7,5,5,5,5,5,5,4,4,3,3,5,6,9,9,8,7,4,4,5,6,7,7,5,5,4,5,6,7,9,9,8,8,6,6,7,7,7,6,4,4,4,5,6,7,9,9,8,7,5,5,7,7,7,6,5,5,4,5,6,6,9,9,8,8,6,4,2,1,1,2,4,4,3,3,4,4,5,4,2,2,0,0,3,5,9,9,7,5,3,3,4,5,6,5,3,3,2,2,4,6,8,9,8,7,5,4,5,6,6,6,4,4,4,4,5,7,9,9,9,7,5,5,6,7,8,8,6,5,4,5,6,7,9,9,9,9,8,7,7,8,8,7,7,6,6,6,7,8,9,9,8,7,6,6,8,9,9,9,8,8,7,7,7,8,9,9,8,8,7,7,7,8,8,8,7,7,6,7,7,8,9,9,9,8,7,7,8,9,9,9,8,8,7,7,8,8,9,9,8,7,2,2,4,4,3,3,0,0,1,1,3,5,9,9,8,6,2,2,3,4,6,5,3,2,2,3,5,6,9,9,7,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},{"n":"Take the Ride","g":"Rock","f":"freepd.com/Take the Ride.mp3","per":0.495868,"ph":0.032,"nb":528,"down":3,"dur":262.03,"lv":[9,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,4,5,6,7,7,7,7,7,6,7,7,6,6,5,5,5,5,6,6,7,7,6,6,6,6,7,7,7,7,6,6,5,5,6,7,7,7,7,6,6,6,7,7,8,7,6,6,5,5,6,7,8,8,7,6,6,6,7,7,7,6,5,5,5,5,6,6,7,7,6,6,5,6,6,7,7,6,6,5,5,5,5,6,7,7,6,6,5,5,6,7,6,6,5,4,5,5,6,7,7,7,6,6,6,6,7,7,7,6,6,5,5,5,6,7,8,8,7,7,7,7,8,8,8,8,7,7,8,8,8,8,8,8,8,8,8,7,7,7,7,7,7,7,8,7,7,7,7,7,7,8,8,7,7,8,7,7,7,7,8,8,7,7,8,8,9,9,9,9,9,9,8,8,9,8,9,9,8,8,8,8,9,9,9,9,9,9,8,8,9,8,9,9,9,9,9,8,7,6,5,5,6,6,6,6,5,5,4,4,6,6,7,7,6,5,5,5,5,6,6,6,6,5,5,5,6,6,7,7,6,4,2,1,0,0,1,3,5,4,3,2,1,2,3,4,5,4,2,1,0,0,2,4,5,4,3,1,1,2,3,5,5,6,5,6,6,6,6,5,4,4,4,4,5,6,6,6,6,5,6,6,7,7,7,6,5,5,5,5,6,7,7,7,6,5,6,6,7,7,7,7,6,5,5,5,6,7,7,8,7,6,6,6,7,7,7,7,6,5,5,5,6,6,7,7,6,6,5,6,6,6,6,6,5,4,5,4,5,6,7,7,7,6,5,5,6,6,7,6,6,5,5,5,6,6,7,7,6,6,6,6,6,7,7,6,6,5,5,5,6,7,7,8,7,7,7,7,8,8,8,8,8,7,8,8,8,8,8,8,9,9,8,7,7,7,7,7,7,7,8,8,7,7,7,7,7,8,8,7,8,8,7,7,7,7,8,8,7,7,8,8,9,9,9,9,9,9,9,9,9,8,9,9,9,8,8,9,9,9,9,9,9,9,8,8,8,9,9,9,9,8,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,7,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},{"n":"Guerilla Tactics","g":"Aksiyon","f":"freepd.com/Guerilla Tactics.mp3","per":0.5,"ph":0.1365,"nb":218,"down":0,"dur":109.19,"lv":[9,9,5,6,5,4,2,1,3,4,7,7,5,4,1,1,2,4,6,6,5,4,2,2,3,4,6,6,4,3,0,0,2,4,7,8,8,9,9,9,9,8,8,7,5,2,0,0,2,6,9,9,9,9,9,9,9,9,9,8,5,2,0,0,1,4,8,9,9,9,7,6,6,6,7,8,5,3,0,0,2,5,7,8,6,5,5,5,6,8,9,8,7,4,1,1,2,4,7,8,7,6,5,4,5,6,7,6,3,1,0,0,2,5,7,8,7,5,4,3,4,5,7,8,7,5,3,2,3,5,7,8,8,8,6,5,6,6,7,6,5,3,1,1,2,3,6,7,6,6,5,4,5,7,8,9,9,8,8,7,7,8,9,9,8,8,7,7,7,8,8,8,7,5,3,3,3,4,5,5,4,3,2,2,3,4,5,5,2,2,1,1,3,4,5,5,3,3,2,2,4,3,5,4,3,3,2,3,0,0,0,0,0,0,0,0,0,0]},{"n":"Uberpunch","g":"Hızlı · metal","f":"freepd.com/Uberpunch.mp3","per":0.4,"ph":0.2085,"nb":234,"down":2,"dur":93.88,"lv":[9,9,4,9,8,8,7,6,7,7,6,6,5,5,8,9,9,9,9,8,7,6,7,7,7,8,8,7,7,8,8,9,9,9,6,0,0,1,0,0,0,0,0,0,0,0,1,6,6,5,5,1,1,2,2,1,0,1,0,0,0,0,0,7,8,8,8,8,9,8,8,9,9,9,9,8,8,8,8,8,9,9,9,8,8,8,8,8,8,8,8,8,8,9,9,9,8,7,7,8,8,9,8,8,7,6,6,5,5,6,5,5,5,5,7,8,9,9,9,9,9,8,7,2,2,2,1,0,2,2,4,8,7,7,8,8,9,8,6,3,3,3,3,3,4,4,6,8,8,9,9,9,9,7,7,6,6,6,5,4,4,4,5,7,7,6,6,5,6,7,7,6,5,5,6,7,8,8,8,7,7,6,6,6,7,8,7,7,6,6,8,9,9,9,9,8,8,7,7,6,7,7,6,6,5,5,7,8,9,9,8,6,6,6,6,6,7,7,6,6,6,6,8,7,0,0,0,0,0,0,0,0,0,0]},{"n":"Limit 70","g":"Funk","f":"freepd.com/Limit 70.mp3","per":0.58451,"ph":0.029,"nb":516,"down":0,"dur":301.66,"lv":[9,9,0,0,0,1,1,1,1,2,2,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,2,3,4,4,4,3,2,1,1,1,2,2,2,2,2,3,3,4,4,5,5,5,4,3,2,2,1,1,1,0,0,0,0,0,1,6,8,8,7,7,7,6,6,6,6,6,6,7,7,7,7,7,7,7,7,7,7,8,8,8,8,8,7,6,5,6,7,7,8,8,8,7,7,7,7,7,7,7,7,6,8,9,9,9,9,8,8,7,7,7,7,7,7,7,7,6,5,5,4,4,5,4,5,5,5,5,5,5,4,4,5,5,6,6,6,6,5,5,5,5,5,5,5,5,5,5,5,2,0,3,4,7,9,8,8,8,8,9,9,9,9,9,9,9,8,8,8,8,9,8,7,7,7,8,9,9,9,9,8,8,7,8,9,9,9,9,8,8,7,8,8,8,8,9,9,9,9,9,9,9,9,9,9,8,8,8,8,8,8,9,9,9,9,9,9,9,9,8,7,7,7,7,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,9,9,8,7,6,7,5,6,5,5,3,3,2,3,4,5,6,6,6,7,8,7,6,6,6,6,5,4,2,2,3,3,5,5,6,7,7,8,9,9,9,9,9,8,7,8,8,8,9,9,9,9,9,9,9,9,9,9,9,9,7,7,7,7,9,8,7,6,5,6,7,8,9,8,7,7,7,7,8,8,9,9,9,9,8,8,8,7,8,8,8,9,8,8,9,9,9,9,9,9,8,9,9,8,9,8,8,8,8,8,8,8,8,8,8,8,8,8,8,9,9,9,9,9,9,8,8,7,7,7,6,7,5,6,6,5,4,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,2,2,2,1,2,2,3,3,2,2,1,1,1,1,1,0,0,1,1,2,3,4,5,4,4,3,1,0,0,0,1,1,0,0,0,0,0,3,7,8,8,8,7,7,7,7,7,7,7,7,7,7,7,8,8,7,7,7,7,6,7,7,7,8,7,6,5,4,5,6,7,9,8,8,8,8,8,8,8,8,8,7,7,8,9,9,9,8,7,7,6,7,6,6,6,6,6,6,6,4,0,0,0,0,0]}];
-var TB = null, TSRC = null, TLOAD = null;   // çözülmüş ses (yalnız son parça bellekte), çalan kaynak, süren indirme
+var TRACKS = [{"n":"Hit n Smash","g":"Elektro rock","f":"freepd.com/Hit n Smash.mp3","per":0.461538,"ph":0.053,"nb":288,"down":1,"dur":133.02,"lv":[9,9,0,0,0,0,2,4,4,4,2,2,3,4,3,3,1,0,0,0,2,4,8,8,7,5,1,1,3,3,3,3,0,0,0,0,2,4,8,8,8,7,5,5,5,5,5,5,4,4,3,3,5,6,9,9,8,7,4,4,5,6,7,7,5,5,4,5,6,7,9,9,8,8,6,6,7,7,7,6,4,4,4,5,6,7,9,9,8,7,5,5,7,7,7,6,5,5,4,5,6,6,9,9,8,8,6,4,2,1,1,2,4,4,3,3,4,4,5,4,2,2,0,0,3,5,9,9,7,5,3,3,4,5,6,5,3,3,2,2,4,6,8,9,8,7,5,4,5,6,6,6,4,4,4,4,5,7,9,9,9,7,5,5,6,7,8,8,6,5,4,5,6,7,9,9,9,9,8,7,7,8,8,7,7,6,6,6,7,8,9,9,8,7,6,6,8,9,9,9,8,8,7,7,7,8,9,9,8,8,7,7,7,8,8,8,7,7,6,7,7,8,9,9,9,8,7,7,8,9,9,9,8,8,7,7,8,8,9,9,8,7,2,2,4,4,3,3,0,0,1,1,3,5,9,9,8,6,2,2,3,4,6,5,3,2,2,3,5,6,9,9,7,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"acc":"912161219262625352429242623972315141912192368467313191217239723161419121923785775156922273397243624892228338946751489122533972632248913243479587625392335339623262459233944886774144913253396232624492338549968793333333445679981135911173489352514691219247957741359111624792942146913242479577625792326339724382599232743795776158922274499273325992434438968673679333644972438359934374479576625792336449926443489344444996978257933374497353935993336447957672579233644992744348934455499786324692226239723272469221823795776136921182498273314792334248957796643321898655339969778595535521"},{"n":"Take the Ride","g":"Rock","f":"freepd.com/Take the Ride.mp3","per":0.495868,"ph":0.032,"nb":528,"down":3,"dur":262.03,"lv":[9,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,4,5,6,7,7,7,7,7,6,7,7,6,6,5,5,5,5,6,6,7,7,6,6,6,6,7,7,7,7,6,6,5,5,6,7,7,7,7,6,6,6,7,7,8,7,6,6,5,5,6,7,8,8,7,6,6,6,7,7,7,6,5,5,5,5,6,6,7,7,6,6,5,6,6,7,7,6,6,5,5,5,5,6,7,7,6,6,5,5,6,7,6,6,5,4,5,5,6,7,7,7,6,6,6,6,7,7,7,6,6,5,5,5,6,7,8,8,7,7,7,7,8,8,8,8,7,7,8,8,8,8,8,8,8,8,8,7,7,7,7,7,7,7,8,7,7,7,7,7,7,8,8,7,7,8,7,7,7,7,8,8,7,7,8,8,9,9,9,9,9,9,8,8,9,8,9,9,8,8,8,8,9,9,9,9,9,9,8,8,9,8,9,9,9,9,9,8,7,6,5,5,6,6,6,6,5,5,4,4,6,6,7,7,6,5,5,5,5,6,6,6,6,5,5,5,6,6,7,7,6,4,2,1,0,0,1,3,5,4,3,2,1,2,3,4,5,4,2,1,0,0,2,4,5,4,3,1,1,2,3,5,5,6,5,6,6,6,6,5,4,4,4,4,5,6,6,6,6,5,6,6,7,7,7,6,5,5,5,5,6,7,7,7,6,5,6,6,7,7,7,7,6,5,5,5,6,7,7,8,7,6,6,6,7,7,7,7,6,5,5,5,6,6,7,7,6,6,5,6,6,6,6,6,5,4,5,4,5,6,7,7,7,6,5,5,6,6,7,6,6,5,5,5,6,6,7,7,6,6,6,6,6,7,7,6,6,5,5,5,6,7,7,8,7,7,7,7,8,8,8,8,8,7,8,8,8,8,8,8,9,9,8,7,7,7,7,7,7,7,8,8,7,7,7,7,7,8,8,7,8,8,7,7,7,7,8,8,7,7,8,8,9,9,9,9,9,9,9,9,9,8,9,9,9,8,8,9,9,9,9,9,9,9,8,8,8,9,9,9,9,8,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,9,7,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"acc":"889879889889887977877779888997987787788978988888789678886777796756978787758566958696779775967576659788779696988785867596759566949696767796977696869687769686967655957585879776777575769784967696859687978695877785966667769675877596768795968665859677977697878866969797768677967596778676767596768576978696866775766697969676855586898776968787779688877786679685958775768577967695879587889998768798687796988786967797767677968697889976957876879678768888987774656697868687966576669675958586769678967696778676866796958585644466699979989998989999997898787887787979879989997789786957656966558577958576769575867696859787966596778776967696759577877596667585968776869897889586779776958796669667667697778785967667969698887695879796968687757566966595659586957797869586877596779576968886659677977595777575967797879796867677769777968797869777979797979654978998689898985696666668676796659566656696778667967886779868887797887887978997788688986776779676968878779677876997887889888899769787776796777778968797778767967797878856967775879788978796687696443322997664339742100091100000"},{"n":"Guerilla Tactics","g":"Aksiyon","f":"freepd.com/Guerilla Tactics.mp3","per":0.5,"ph":0.1365,"nb":218,"down":0,"dur":109.19,"lv":[9,9,5,6,5,4,2,1,3,4,7,7,5,4,1,1,2,4,6,6,5,4,2,2,3,4,6,6,4,3,0,0,2,4,7,8,8,9,9,9,9,8,8,7,5,2,0,0,2,6,9,9,9,9,9,9,9,9,9,8,5,2,0,0,1,4,8,9,9,9,7,6,6,6,7,8,5,3,0,0,2,5,7,8,6,5,5,5,6,8,9,8,7,4,1,1,2,4,7,8,7,6,5,4,5,6,7,6,3,1,0,0,2,5,7,8,7,5,4,3,4,5,7,8,7,5,3,2,3,5,7,8,8,8,6,5,6,6,7,6,5,3,1,1,2,3,6,7,6,6,5,4,5,7,8,9,9,8,8,7,7,8,9,9,8,8,7,7,7,8,8,8,7,5,3,3,3,4,5,5,4,3,2,2,3,4,5,5,2,2,1,1,3,4,5,5,3,3,2,2,4,3,5,4,3,3,2,3,0,0,0,0,0,0,0,0,0,0],"acc":"9354427292397479967863959776686695665293934855799577529597866867946542729346545853555394967767669455316294575557424642939577575694645364849667877585749675957596947464858496678795867597658456979474648585976797968585976695768696766687968664989576679766755697945454648495659694555586758456979475657573956698967667876584579794665666948454778586669795865888978663947465439876966595749747969464437363674398768664956497468592110000956593339642"},{"n":"Uberpunch","g":"Hızlı · metal","f":"freepd.com/Uberpunch.mp3","per":0.4,"ph":0.2085,"nb":234,"down":2,"dur":93.88,"lv":[9,9,4,9,8,8,7,6,7,7,6,6,5,5,8,9,9,9,9,8,7,6,7,7,7,8,8,7,7,8,8,9,9,9,6,0,0,1,0,0,0,0,0,0,0,0,1,6,6,5,5,1,1,2,2,1,0,1,0,0,0,0,0,7,8,8,8,8,9,8,8,9,9,9,9,8,8,8,8,8,9,9,9,8,8,8,8,8,8,8,8,8,8,9,9,9,8,7,7,8,8,9,8,8,7,6,6,5,5,6,5,5,5,5,7,8,9,9,9,9,9,8,7,2,2,2,1,0,2,2,4,8,7,7,8,8,9,8,6,3,3,3,3,3,4,4,6,8,8,9,9,9,9,7,7,6,6,6,5,4,4,4,5,7,7,6,6,5,6,7,7,6,5,5,6,7,8,8,8,7,7,6,6,6,7,8,7,7,6,6,8,9,9,9,9,8,8,7,7,6,7,7,6,6,5,5,7,8,9,9,8,6,6,6,6,6,7,7,6,6,6,6,8,7,0,0,0,0,0,0,0,0,0,0],"acc":"039675964343349356656595655554955875659566655595556654956555659435545493924343723364449333439273736354939243435243554493335494949385548466857595837476946466947384445494659566947474659465659583944332624333948434858893526567937394438443339474349898935298879383944494443394843367978353678793739443844333946434778893637788939453336365444494656575966445559457667595556555945565659454344493576565964564459355868596444454936866569564544493667675969879889699754322974310002984"},{"n":"Limit 70","g":"Funk","f":"freepd.com/Limit 70.mp3","per":0.58451,"ph":0.029,"nb":516,"down":0,"dur":301.66,"lv":[9,9,0,0,0,1,1,1,1,2,2,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,2,3,4,4,4,3,2,1,1,1,2,2,2,2,2,3,3,4,4,5,5,5,4,3,2,2,1,1,1,0,0,0,0,0,1,6,8,8,7,7,7,6,6,6,6,6,6,7,7,7,7,7,7,7,7,7,7,8,8,8,8,8,7,6,5,6,7,7,8,8,8,7,7,7,7,7,7,7,7,6,8,9,9,9,9,8,8,7,7,7,7,7,7,7,7,6,5,5,4,4,5,4,5,5,5,5,5,5,4,4,5,5,6,6,6,6,5,5,5,5,5,5,5,5,5,5,5,2,0,3,4,7,9,8,8,8,8,9,9,9,9,9,9,9,8,8,8,8,9,8,7,7,7,8,9,9,9,9,8,8,7,8,9,9,9,9,8,8,7,8,8,8,8,9,9,9,9,9,9,9,9,9,9,8,8,8,8,8,8,9,9,9,9,9,9,9,9,8,7,7,7,7,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,8,9,9,8,7,6,7,5,6,5,5,3,3,2,3,4,5,6,6,6,7,8,7,6,6,6,6,5,4,2,2,3,3,5,5,6,7,7,8,9,9,9,9,9,8,7,8,8,8,9,9,9,9,9,9,9,9,9,9,9,9,7,7,7,7,9,8,7,6,5,6,7,8,9,8,7,7,7,7,8,8,9,9,9,9,8,8,8,7,8,8,8,9,8,8,9,9,9,9,9,9,8,9,9,8,9,8,8,8,8,8,8,8,8,8,8,8,8,8,8,9,9,9,9,9,9,8,8,7,7,7,6,7,5,6,6,5,4,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,2,2,2,2,1,2,2,3,3,2,2,1,1,1,1,1,0,0,1,1,2,3,4,5,4,4,3,1,0,0,0,1,1,0,0,0,0,0,3,7,8,8,8,7,7,7,7,7,7,7,7,7,7,7,8,8,7,7,7,7,6,7,7,7,8,7,6,5,4,5,6,7,9,8,8,8,8,8,8,8,8,8,7,7,8,9,9,9,8,7,7,6,7,6,6,6,6,6,6,6,4,0,0,0,0,0],"acc":"022111977222119772221197722121978221119772211197622110967221119671663198716612967256129771761296927751987177119771571198600000975296879851967885417567955176779462877797519678965176689661979124812256975196688551756895517667972122669751966886517668966197912461335697729888996096679872867798708696977298889960967798829781192121519882718198819170989191718792827197727181989191819891917181312357997777869987977789869778899687788887778799778777898697789131234698727786978277989891877898927777988267869782779797918878924111619751009196500090965021908650109186500080965011909640118192312146974692779647928797589398985692789746926897469287974892879241315698469367974793879747838797589388884693779746937797479387913124589947997998469968974799889947888988478879884588589748998791411111977221119772211197722211968221119771211197722111976221109672664198726612967156129671661295816641987166119771571197701001974176769651857795517568965196789451767696418566975176689751967124712256964175679642656896519668882123569741756697516667965196812494000000"}];
+var TB = null, TSRC = null, TLOAD = null, TF = null, TG = null, TX = 1;   // çözülmüş ses (yalnız son parça bellekte), çalan kaynak, süren indirme
 function trkUrls(t) { var p = t.f.split('/').map(encodeURIComponent).join('/'); return ['https://raw.githubusercontent.com/SoundSafari/CC0-1.0-Music/' + TSHA + '/' + p, 'https://cdn.jsdelivr.net/gh/SoundSafari/CC0-1.0-Music@' + TSHA + '/' + p]; }
 function trkMsg(s) { var e = $('trkMsg'); if (!e) { e = document.createElement('div'); e.id = 'trkMsg'; e.style.cssText = 'position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);background:#101418;border:1px solid #3ddc97;color:#f2f4f5;padding:18px 22px;border-radius:14px;font:600 17px system-ui;z-index:99;text-align:center;max-width:80vw'; document.body.appendChild(e); } e.innerHTML = s; e.style.display = s ? 'block' : 'none'; }
 function trkLoad(t, cb) {   // indir + çöz; bitince cb(true/false)
@@ -1445,10 +1451,33 @@ function trkPlay(when, off, loop, t) {   // parçayı bg yoluna bağlar; loop: [
   trkStop(); if (!TB || !bg) return;
   var s = ac.createBufferSource(); s.buffer = TB.buf;
   if (loop) { s.loop = true; s.loopStart = loop[0]; s.loopEnd = loop[1]; }
-  s.connect(bg); var now = ac.currentTime; if (when < now + 0.03) { off += now + 0.03 - when; when = now + 0.03; }
+  try { TF = ac.createBiquadFilter(); TF.type = 'lowpass'; TF.Q.value = 0.8; TF.frequency.value = 18000; TG = ac.createGain(); TG.gain.value = 1; s.connect(TF); TF.connect(TG); TG.connect(bg); }
+  catch (e) { TF = null; TG = null; s.connect(bg); }
+  var now = ac.currentTime; if (when < now + 0.03) { off += now + 0.03 - when; when = now + 0.03; }
   s.start(when, Math.max(0, off)); TSRC = s;
 }
-function trkStop() { if (TSRC) { try { TSRC.stop(); } catch (e) {} try { TSRC.disconnect(); } catch (e) {} TSRC = null; } }
+/* müziğin açıklığı (0 boğuk: yalnız bas ve davul gövdesi duyulur, 1 tam parça): yumruklar müziği açar */
+function trkOpen(x, tc) {
+  if (!TF) return; x = Math.max(0, Math.min(1, x)); if (Math.abs(x - TX) < 0.01) return; TX = x;
+  var t = ac.currentTime, f = 260 * Math.pow(2, x * 6.3);
+  try { TF.frequency.cancelScheduledValues(t); TF.frequency.setTargetAtTime(f, t, tc || 0.06); TG.gain.setTargetAtTime(0.7 + 0.3 * x, t, tc || 0.06); } catch (e) { TF.frequency.value = f; }
+}
+function trkTick() {
+  var g = game, now, en, x, i, n;
+  if (!g || !g.trk || !TF || g.done) return;
+  now = performance.now();
+  if (g.notes && g.notes.length) {   // OYNA: kaçırınca parça boğulur, isabetle geri açılır (Guitar Hero mantığı)
+    x = 1; for (i = g.notes.length - 1; i >= 0; i--) { n = g.notes[i]; if (n.st) { x = n.st === 'miss' ? 0.08 : 1; break; } }
+    trkOpen(x, x < 1 ? 0.12 : 0.03);
+  } else if (g.en) {   // serbest çal ve raund: vurdukça parça açılır, durunca kapanır, patlamada tam
+    en = g.en; enDecay(en, now);
+    x = now < en.bEnd ? 1 : 0.05 + 0.9 * Math.pow(en.e, 0.8);
+    if (g.rd && g.rd.ph !== 'work') x = 0.25;
+    trkOpen(x, 0.15);
+  }
+}
+setInterval(trkTick, 30);
+function trkStop() { TF = null; TG = null; TX = 1; if (TSRC) { try { TSRC.stop(); } catch (e) {} try { TSRC.disconnect(); } catch (e) {} TSRC = null; } }
 function trkBar(t, b) { return t.ph + (t.down + 4 * b) * t.per; }   // b. ölçü başının parça içindeki zamanı (sn)
 function trkBarLv(t, b) { var i = t.down + 4 * b, s = 0, k; for (k = 0; k < 4; k++) s += t.lv[Math.min(t.lv.length - 1, i + k)] || 0; return s / 4; }
 function trkStart(t) {   // girişten sonra müziğin oturduğu ilk ölçü: seviye 3'ü geçen ilk ölçüden bir ölçü önce
@@ -1462,6 +1491,16 @@ function kPool(lvl) {
   if (lvl === 2) [[1, 1, 2, 1, 2, 3], [1, 2, 3, 2, 1, 2], [1, 2, 1, 2, 3, 2], [1, 1, 2, 3, 2], [1, 2, 3, 4, 3]].forEach(add);
   if (lvl >= 1) [[1, 1, 2, 3], [1, 1, 2, 1, 2], [1, 2, 3, 2, 3]].forEach(add);
   return P;
+}
+/* v1.4: kombonun yumrukları ölçünün içinde parçanın en güçlü vurgularına oturur (vurgu haritası: sekizlik başına 0-9).
+   İlk yumruk ölçü başında (koçun "şimdi"si), kalanlar komboya yakın pencerede en güçlü sekizliklerde; hızlı parçada ve Kolay'da yalnız vuruşlarda. */
+function accPos(t, bar, L, step, lvl) {
+  var e0 = (t.down + 4 * bar) * 2, inc = step === 1 ? 2 : 1, win = Math.min(8, Math.max(L * inc + inc, lvl === 2 ? 8 : 6)), c = [], k, a, out = [0];
+  for (k = inc; k < win; k += inc) { a = +(t.acc || '').charAt(e0 + k) || 0; c.push([k, a - k * 0.15]); }
+  c.sort(function (x, y) { return y[1] - x[1]; });
+  for (k = 0; out.length < L && k < c.length; k++) out.push(c[k][0]);
+  for (k = inc; out.length < L; k += inc) if (out.indexOf(k) < 0) out.push(k);
+  return out.sort(function (x, y) { return x - y; });
 }
 function trkBuild(t) {
   return function (lvl) {
@@ -1480,7 +1519,8 @@ function trkBuild(t) {
       pool = P[L]; k = (b * 7 + L * 3 + lvl) % pool.length; sq = pool[k];
       if (last && sq.join() === last.join() && pool.length > 1) sq = pool[(k + 1) % pool.length];
       last = sq;
-      for (j = 0; j < sq.length; j++) notes.push({ t: Math.round(tR + j * step * q), p: (lv >= 7.5 && j === sq.length - 1 && sq.length > 1) || (lv >= 8.5 && j === 0) ? 5 : 1, fq: 0, num: sq[j] });
+      var pos = accPos(t, B0 + (cyc === 1 ? b : b + 1), sq.length, step, lvl);
+      for (j = 0; j < sq.length; j++) notes.push({ t: Math.round(tR + pos[j] * 0.5 * q), p: (lv >= 7.5 && j === sq.length - 1 && sq.length > 1) || (lv >= 8.5 && j === 0) ? 5 : 1, fq: 0, num: sq[j] });
       calls.push({ t: Math.round(tR - (cyc === 1 ? 2 : 4) * q - 120), at: Math.round(tR), seq: sq });
     }
     return { notes: notes, grid: [], bass: [], bgx: [], calls: calls, len: Math.round(nb * 4 * q), beat: q, bpm: Math.round(60 / per), trk: t, B0: B0 };
@@ -1490,12 +1530,36 @@ var TFIRST = SONGS.length;
 TRACKS.forEach(function (t) { SONGS.push({ n: t.n, by: t.g + ' · gerçek kayıt', trk: t, build: trkBuild(t) }); });
 if (!S.k130) { S.k130 = 1; S.i = TFIRST; save(); }
 if (S.dev && !S.k131 && S.pwi > S.pw * 1.2) { S.pw = r1(S.light + 0.67 * (S.hard - S.light) * 0.9); S.pwi = S.pw; S.lb = []; } S.k131 = 1;
+/* gerçek kayıt vuruş sesleri: Sonic Pi örnek kütüphanesi (CC0), açılışta bir kez iner (toplam ~140 KB) */
+var SMPSHA = 'b39c72bd79024e6eec58c4f55c333ede79b700b6', SMP = {}, SMPGO = false;
+var SMPN = ['drum_snare_hard', 'drum_snare_soft', 'drum_heavy_kick', 'drum_bass_hard', 'drum_tom_lo_hard', 'drum_cymbal_hard', 'drum_splash_hard', 'bass_hit_c', 'elec_hi_snare'];
+function smpLoad() {
+  if (SMPGO || !ac || typeof fetch !== 'function') return; SMPGO = true;
+  SMPN.forEach(function (n) {
+    var u = 'https://raw.githubusercontent.com/smpldsnds/sonic-pi-samples/' + SMPSHA + '/samples/' + n + '.m4a';
+    fetch(u).then(function (r) { if (!r.ok) throw 0; return r.arrayBuffer(); }).then(function (ab) { return new Promise(function (res, rej) { var p = ac.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); }); })
+      .then(function (b) { var m = 0, c, d, i; for (c = 0; c < b.numberOfChannels; c++) { d = b.getChannelData(c); for (i = 0; i < d.length; i++) if (Math.abs(d[i]) > m) m = Math.abs(d[i]); } SMP[n] = { b: b, k: m > 0 ? 0.9 / m : 1 }; }).catch(function () {});
+  });
+}
+function smp(n, v, when, rate) {   // örneği çal; yoksa false döner (sentez yedeğe düşülür)
+  var x = SMP[n]; if (!x || !ac) return false;
+  var s = ac.createBufferSource(), g = ac.createGain(); s.buffer = x.b; if (rate) s.playbackRate.value = rate; g.gain.value = v * x.k; s.connect(g); g.connect(mst); s.start(when || 0); return true;
+}
 function vol2(s) { return Math.max(0.3, Math.min(1, 0.3 + 0.7 * s / Math.max(10, S.hard))); }   // şiddet (s) ile ses gücü
 function kitClick(burst) {   // vuruş anında hemen: kısa darbe (şiddet ~80 ms sonra ölçülür, gövde o zaman eklenir)
+  if (smp('drum_snare_hard', burst ? 0.85 : 0.7)) { if (burst) smp('elec_hi_snare', 0.4); return; }
   var t = ac.currentTime, o = ac.createGain(); o.gain.value = burst ? 0.75 : 0.6; o.connect(mst);
   nz(3000, 0.05, 0.6, t, o); tone('triangle', 260, 140, 0.06, 0.5, t, o);
 }
 function kitBody(v, tier, burst, lvNow) {   // gövde: hafif trampet, orta + bas davul, sert + gümbürtü ve zil; ses gücü şiddetle büyür
+  if (SMP.drum_heavy_kick) {   // gerçek kayıtlar: darbenin ağırlığı (ilk "şak" kitClick'te çaldı)
+    var gv = v * (0.85 + 0.3 * (lvNow || 0.5)) * (burst ? 1.15 : 1);
+    if (tier === 0) smp('drum_snare_soft', 0.35 * gv);
+    if (tier >= 1) { smp('drum_heavy_kick', 0.95 * gv); smp('drum_tom_lo_hard', 0.45 * gv); }
+    if (tier >= 2) { smp('drum_bass_hard', gv); smp('drum_cymbal_hard', 0.55 * gv); smp('bass_hit_c', 0.5 * gv); }
+    if (burst) smp('drum_splash_hard', 0.4 * gv);
+    return;
+  }
   var t = ac.currentTime, o = ac.createGain(); o.gain.value = v * (0.85 + 0.3 * (lvNow || 0.5)) * (burst ? 1.15 : 1); o.connect(mst);
   nz(1800, 0.14, 0.7, t, o); tone('triangle', 220, 110, 0.14, 0.55, t, o);
   if (tier >= 1) tone('sine', 120, 45, 0.3, 0.9, t, o);
@@ -1510,7 +1574,47 @@ function kitSnd(v, tier, burst, lvNow) {   // gerçek parçada yumruk sesi: gü�
   if (tier >= 2) { tone('sine', 150, 38, 0.6, 1, t, o); nz(2500, 0.4, 0.45, t, o); nz(5200, 0.8, 0.4, t, o); }
   if (burst) nz(5200, 0.45, 0.3, t, o);
 }
+function trkFree(g, now) {   // serbest çal gerçek parçayla: parça döner, yumruklar onu açar
+  var TT = g.trk, B0 = trkStart(TT), nb = Math.floor((TT.nb - TT.down) / 4) - 1, ls = trkBar(TT, B0), le = trkBar(TT, Math.max(B0 + 8, nb));
+  g.toff = ls; g.tloop = [ls, le]; g.a0 = ac.currentTime + 0.15; g.ev = []; g.ei = 0; g.xv = null; g.lv = 0;
+  g.bgm = { t0: now + 150, len: (le - ls) * 1000, bass: [], bpm: Math.round(60 / TT.per), q: TT.per }; bg.gain.value = 0.8;
+  trkPlay(g.a0, ls, [ls, le]); trkOpen(0.05, 0.01);
+}
 function trkLvAt(g, now) { var t = g.trk, s = ((now - g.bgm.t0) / 1000) + g.toff, L = g.tloop, i; if (L && s > L[1]) s = L[0] + (s - L[0]) % (L[1] - L[0]); i = Math.floor((s - t.ph) / t.per); return (t.lv[Math.max(0, Math.min(t.lv.length - 1, i))] || 0) / 9; }
+/* ---------- mikrofon (deneysel, İnce ayar'dan açılır) ----------
+   Torbaya çarpmanın kalın "güp" sesi mikrofonda milisaniye hassasiyetle görünür. Bu sürüm yalnız ÖLÇER ve kaydeder:
+   her vuruşa en yakın mikrofon darbesinin zaman farkı (ms) ve ses gücü eklenir (rapor: vuruş satırının 5. alanı [dt, güç]).
+   Rapor gelince karar: mikrofon zamanlamayı ve gücü ivmeölçerden daha iyi veriyorsa algılamaya bağlanır. */
+var MIC = { on: false, ev: [], med: [], st: null, n: 0 };
+function micStart() {
+  if (MIC.on) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { toast('Bu tarayıcıda mikrofon yok.'); return; }
+  initAudio();
+  navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false } }).then(function (st) {
+    var src = ac.createMediaStreamSource(st), lp = ac.createBiquadFilter(), sp = ac.createScriptProcessor(256, 1, 1), z = ac.createGain();
+    lp.type = 'lowpass'; lp.frequency.value = 250; z.gain.value = 0;
+    src.connect(lp); lp.connect(sp); sp.connect(z); z.connect(ac.destination);
+    var prev = 0;
+    sp.onaudioprocess = function (e) {
+      var d = e.inputBuffer.getChannelData(0), q = 0, i, r, m, now = performance.now();
+      for (i = 0; i < d.length; i++) q += d[i] * d[i];
+      r = Math.sqrt(q / d.length); MIC.n++;
+      MIC.med.push(r); if (MIC.med.length > 60) MIC.med.shift();
+      m = MIC.med.slice().sort(function (a, b) { return a - b; })[Math.floor(MIC.med.length / 2)] || 0;
+      if (r > 4 * m + 0.002 && r > 1.6 * prev && (!MIC.ev.length || now - MIC.ev[MIC.ev.length - 1].t > 90)) { MIC.ev.push({ t: now - 1000 * d.length / ac.sampleRate, lv: r, bg: m }); if (MIC.ev.length > 200) MIC.ev.shift(); }
+      prev = r;
+    };
+    MIC.on = true; MIC.st = st; MIC.keep = [src, lp, sp, z]; S.mic = 1; save(); toast('Mikrofon açık: vuruşlar ölçülüyor.'); renderMenu();
+  }).catch(function () { toast('Mikrofon izni verilmedi.'); S.mic = 0; save(); renderMenu(); });
+}
+function micStop() { if (MIC.st) MIC.st.getTracks().forEach(function (t) { t.stop(); }); if (MIC.keep) MIC.keep.forEach(function (n) { try { n.disconnect(); } catch (e) {} }); MIC.on = false; MIC.st = null; S.mic = 0; save(); renderMenu(); }
+function micTag(h) {   // ivmeölçer vuruşuna en yakın mikrofon darbesi (önce 150 ms, sonra 60 ms içinde)
+  if (!MIC.on) return;
+  setTimeout(function () {
+    var best = null; MIC.ev.forEach(function (e) { var dt = e.t - h.t; if (dt > -150 && dt < 60 && (!best || Math.abs(dt) < Math.abs(best.t - h.t))) best = e; });
+    h.mic = best ? [Math.round(best.t - h.t), Math.round(best.lv * 1000) / 1000, Math.round(best.bg * 10000) / 10000] : [null, 0, 0];
+  }, 80);
+}
 var wl = null;
 function wake() { try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (l) { wl = l; }).catch(function () {}); } catch (e) {} }
 document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && running) { wake(); try { if (ac) ac.resume(); } catch (e) {} } });
