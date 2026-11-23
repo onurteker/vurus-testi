@@ -1,0 +1,16 @@
+Copyright (c) 2026 Onur Teker (Marte). All rights reserved.
+
+This repository, including all source code, designs, game mechanics, audio
+mappings, beat maps and documentation, is proprietary. No licence is granted.
+You may not copy, modify, distribute, sublicense, sell, or use any part of it,
+or create derivative works, without prior written permission from the author.
+Viewing the code in a browser does not grant any right to reuse it.
+
+Telif hakkı (c) 2026 Onur Teker (Marte). Tüm hakları saklıdır.
+Bu depodaki kodun, tasarımın, oyun mekaniklerinin ve belgelerin hiçbir
+bölümü yazılı izin olmadan kopyalanamaz, değiştirilemez, dağıtılamaz,
+satılamaz veya başka bir ürüne dönüştürülemez.
+
+Third-party audio loaded at runtime keeps its own licence (CC0):
+FreePD tracks via SoundSafari/CC0-1.0-Music; Sonic Pi samples via
+smpldsnds/sonic-pi-samples.
