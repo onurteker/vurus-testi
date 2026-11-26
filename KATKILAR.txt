@@ -1,0 +1,17 @@
+Vurus - kullanilan ucuncu taraf sesler / third-party audio credits
+
+Gitar akorlari (gtr/*.m4a):
+  "Electric Guitar Power Chords" by Ax_Grinder, https://freesound.org/people/Ax_Grinder/packs/14939/
+  Lisans: Creative Commons Attribution 3.0 (CC BY 3.0), https://creativecommons.org/licenses/by/3.0/
+  Degisiklik: acik akorlar 6 saniyeye kisaltildi ve sonu kisildi; tum dosyalar mono AAC olarak yeniden kodlandi.
+
+Hazir sarki (sarki.m4a):
+  Music: Jingle Bells by Alexander Nakarada (https://creatorchords.com)
+  Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0)
+  https://creativecommons.org/licenses/by/4.0/
+  Degisiklik: ilk 9,45 saniye kesildi; mono AAC olarak yeniden kodlandi.
+
+Davul ornekleri (sayfa calisirken indirilir):
+  Sonic Pi samples (CC0), https://github.com/smpldsnds/sonic-pi-samples
+
+Bu dosyalar disindaki her sey icin LICENSE dosyasi gecerlidir.
