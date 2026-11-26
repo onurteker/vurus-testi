@@ -11,6 +11,11 @@ Hazir sarki (sarki.m4a):
   https://creativecommons.org/licenses/by/4.0/
   Degisiklik: ilk 9,45 saniye kesildi; mono AAC olarak yeniden kodlandi.
 
+Davul kayitlari (dvl/*.m4a), ikisi de CC0 (kamu mali):
+  "punk-rock groove 140 bpm" by vincent sermonne, https://freesound.org/people/vincent%20sermonne/sounds/423720/
+  "Rock Drums 2" by carloseton, https://freesound.org/people/carloseton/sounds/564388/ (17-32. olculer)
+  Degisiklik: mono AAC olarak yeniden kodlandi; ikincisi kisaltildi.
+
 Davul ornekleri (sayfa calisirken indirilir):
   Sonic Pi samples (CC0), https://github.com/smpldsnds/sonic-pi-samples
 
