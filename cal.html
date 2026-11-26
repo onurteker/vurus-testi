@@ -54,7 +54,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 </head>
 <body>
 <div class="scr on" id="home">
-  <h1>Vuruş</h1><small class="v">Şarkıyı sen çal · v1.7.0</small>
+  <h1>Vuruş</h1><small class="v">Şarkıyı sen çal · v1.7.1</small>
   <p style="margin-top:16px"><b>Jingle Bells'i yumrukla çal.</b> Her yumruk şarkının sıradaki notası. Sert vurdukça gitar ve davul büyür.</p>
   <div class="box"><b>Kurulum</b><p>1. Telefonu torbanın <b>en üst kısmına</b>, vuruş bölgesinin dışına, ekranı sana bakacak şekilde <b>sıkıca</b> bağla. Torbanın en az sallanan yeri üstüdür. Gevşek kayış yanlış sayar.<br>2. Sesi sonuna kadar aç, sessiz modu kapat.<br>3. BAŞLA'ya bas, sensör iznini ver.</p></div>
   <button id="start" class="big primary">BAŞLA</button>
@@ -81,13 +81,12 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
     <div class="row"><span>2. Yumruk tanıtma <small class="v" id="scT"></small></span><span><button id="scTB">Yap</button></span></div>
     <div class="row"><span>3. Hoparlör gecikmesi <small class="v" id="scL"></small></span><span><button id="scLB">Ölç</button></span></div>
     <h2>Seçenekler</h2>
-    <div class="row"><span>Müzik</span><span><button id="scKay"></button></span></div>
+    <div class="row" style="display:none"><span>Müzik</span><span><button id="scKay"></button></span></div>
     <div class="row"><span>Arkadaki ritim</span><span><button id="scMode"></button></span></div>
     <div class="row"><span>Gitar tonu</span><span><button id="scPal"></button></span></div>
     <div class="row"><span>Yumruk türüne göre ses</span><span><button id="scTy"></button></span></div>
-    <p style="font-size:14px">Vur: her yumruk bir nota, şarkı senin hızında ilerler. Hafif yumruk kısa, susturulmuş bir akor çalar; daha sert yumruk açık akor çalar ve sıradaki yumruğa kadar tınlar; çok sertte zil ve gümbürtü eklenir. Düz yumruk trampet, kroşe tom (sol kroşe solda, sağ kroşe sağda), aparkat bas davul. Arkadaki ritim açıkken notalar ona oturur; "yok" seçersen yalnız sen çalarsın ve nota vurduğun an gelir. <small class="v" id="scSnd"></small></p>
-    <p style="font-size:14px"><b>Hazır şarkı</b> seçersen gerçek bir metal Jingle Bells kaydı çalar: vurdukça akar, durunca susar, sert vurdukça yükselir. Bu modda ritim ve gitar tonu seçenekleri kullanılmaz.</p>
-    <p style="font-size:12px;color:var(--dim)">Gitar akorları: Ax_Grinder, "Electric Guitar Power Chords" (freesound.org), CC BY 3.0; kısaltıldı ve yeniden kodlandı. Hazır şarkı: "Jingle Bells" by Alexander Nakarada (creatorchords.com), CC BY 4.0 (creativecommons.org/licenses/by/4.0); baştan kısaltıldı ve yeniden kodlandı. Davullar: Sonic Pi (CC0).</p>
+    <p style="font-size:14px">Vur: her yumruk bir nota, şarkı senin hızında ilerler. Her yumrukta gitar akoru çalar ve sıradaki yumruğa kadar tınlar. Hafif yumruk kısık, orta yumruk dolgun çalar; sert yumrukta ikinci gitar ve bas davul, çok sertte zil ve gümbürtü eklenir. Düz yumruk trampet, kroşe tom (sol kroşe solda, sağ kroşe sağda), aparkat bas davul. Arkadaki ritim açıkken notalar ona oturur; "yok" seçersen yalnız sen çalarsın ve nota vurduğun an gelir. <small class="v" id="scSnd"></small></p>
+    <p style="font-size:12px;color:var(--dim)">Gitar akorları: Ax_Grinder, "Electric Guitar Power Chords" (freesound.org), CC BY 3.0; kısaltıldı ve yeniden kodlandı. Davullar: Sonic Pi (CC0).</p>
   </div>
   <div class="box" id="yBox" style="border-color:var(--hit)">
     <b style="font-size:20px">Yumrukla çal · Hit n Smash</b><small class="v" style="display:block">Elektro rock · 130 vuruş/dk · tek şarkı, tek mod</small>
@@ -164,7 +163,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 <script>
 'use strict';
 var $ = function (id) { return document.getElementById(id); };
-var VER = 'cal-1.7.0', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
+var VER = 'cal-1.7.1', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
 function pn(n) { return { h: n % 2 ? 'L' : 'R', ty: Math.floor((n - 1) / 2) }; }
 function med(a) { if (!a.length) return 0; var s = a.slice().sort(function (p, q) { return p - q; }); return s[Math.floor(s.length / 2)]; }
 function r1(v) { return Math.round(v * 10) / 10; }
@@ -2051,11 +2050,11 @@ $('yQuit').addEventListener('pointerdown', function (e) { e.preventDefault(); $(
 ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (n) { $('yQuit').addEventListener(n, function () { clearTimeout(yqT); $('yQuit').textContent = 'DURDUR · basılı tut'; }); });
 $('cv15').addEventListener('pointerdown', yTap);
 
-/* ---------- v1.7.0 · Şarkıyı sen çal ----------
-   İki müzik kaynağı (menüden seçilir): "gitarı sen çal" (aşağıda) ve "hazır şarkı" (gerçek metal kayıt, sarki.m4a, Alexander Nakarada, CC BY 4.0; scSong).
+/* ---------- v1.7.1 · Şarkıyı sen çal ----------
    Her yumruk Jingle Bells nakaratının sıradaki notası (YOL_HARITASI.md, çekirdek).
    Nota = gerçek elektro gitar akoru: amfiden kaydedilmiş, her nota için ayrı dosya (gtr/, Ax_Grinder, CC BY 3.0). Perde kaydırma ve yapay amfi yok.
-   Hafif yumruk avuçla susturulmuş kısa akor çalar; orta ve üstü açık akor çalar ve sıradaki yumruğa kadar tınlar. Güç ayrıca sesi ve davul katmanını büyütür.
+   Her kademede açık akor çalar ve sıradaki yumruğa kadar tınlar. Güç sesi büyütür; sertte ikinci gitar, çok sertte susturulmuş akorun darbesi, zil ve gümbürtü eklenir.
+   Park edilen: "hazır şarkı" (gerçek metal kayıt vurdukça çalar; scSong, sarki.m4a). v1.7.0'da denendi, beğenilmedi; menüde gizli.
    Yumruk türü (v1.5'in tanıtması ve sınıflayıcısı: yClass) darbeyi değiştirir: düz = trampet, kroşe = tom ve sol/sağ hoparlör, aparkat = bas davul ve susturulmuş akor katmanı. Tür bilinmiyorsa düz gibi çalar.
    Arkada 134'lük ritim döner (üç seçenek), nota en yakın on altılığa oturur (tempo A). Ritim "yok" seçilirse nota yumruk anında çalar (tempo B).
    Kademe oyuncunun kendi son yumruklarına göre belirlenir (v1.5'teki kural): telefonun nasıl bağlandığından bağımsız. */
@@ -2064,6 +2063,7 @@ var SC = { BPM: 134, BACK: 0.17, G: null, mst: null, out: null, back: null, hit:
   GN: ['D2', 'E2', 'Fs2', 'G2', 'A2', 'B2', 'C3', 'D3'] };
 SC.S16 = 60 / SC.BPM / 4;
 if (!S.sc || typeof S.sc !== 'object' || S.sc.rit == null) S.sc = { rit: 1, pal: 1 };
+S.sc.kay = 0;   // hazır şarkı modu park edildi (27 Kas, Marte: "hiç olmamış"); menüdeki düğmesi gizli, kodu (scSong) duruyor
 // arkadaki ritim seçenekleri: [ad, bas davul, trampet, kapalı zil] adımları (ölçü = 16 on altılık). Sonuncusu ritimsiz: tempo B, nota yumruk anında çalar.
 var SCRIT = [['Ağır rock', [0, 6], [8], [0, 4, 8, 12]], ['Hızlı rock', [0, 8, 10], [4, 12], [0, 2, 4, 6, 8, 10, 12, 14]], ['Nabız', [0, 4, 8, 12], [], [2, 6, 10, 14]], ['Yok · sen yönet']];
 function scA() { return S.sc.kay !== 1 && S.sc.rit < 3; }   // hazır şarkıda arkadan ayrı ritim dönmez
@@ -2074,12 +2074,14 @@ var SCL = [['33333335123', 'Jin gle bells jin gle bells jin gle all the way'], [
 var SCKEYS = [['Kalın (Re)', { 1: 'D2', 2: 'E2', 3: 'Fs2', 4: 'G2', 5: 'A2' }], ['Orta (Sol)', { 1: 'G2', 2: 'A2', 3: 'B2', 4: 'C3', 5: 'D3' }]];
 function scKey() { return SCKEYS[S.sc.pal === 2 ? 1 : 0]; }
 var SCSONG = []; SCL.forEach(function (L, li) { var h = L[1].split(' '); if (h.length !== L[0].length) throw new Error('satır ' + li + ': nota ve hece sayısı tutmuyor'); h.forEach(function (s, i) { SCSONG.push({ d: +L[0][i], s: s, li: li }); }); });
-// kademe: pm = avuçla susturulmuş kısa akor, g = gitarın sesi, darbe davulları [ad, ses]; ilk davul yumruk türüne göre değişir. Seviyeler test/olc_cal.py ile ölçülerek ayarlandı.
+// kademe: her kademede açık akor çalar ve sıradaki yumruğa kadar tınlar (27 Kas: "hafifte gitar çalmıyor" geri bildirimi).
+// g = gitarın sesi; x2 = ikinci gitar (aynı akor 14 ms sonra, çok az farklı perdede: stüdyodaki çift kayıt gibi kalınlaştırır); pm = susturulmuş akorun darbesi de eklenir.
+// Darbe davulları [ad, ses]; ilk davul yumruk türüne göre değişir. Seviyeler test/olc_cal.py ile ölçülerek ayarlandı.
 var SCTIER = [
-  { ad: 'HAFİF', pm: 1, g: 0.34, drums: [['drum_snare_soft', 0.95]] },
-  { ad: 'ORTA', g: 0.6, drums: [['drum_snare_hard', 0.75]] },
-  { ad: 'SERT', g: 0.85, drums: [['drum_snare_hard', 0.9], ['drum_heavy_kick', 1]] },
-  { ad: 'GÜM!', g: 1.15, drums: [['drum_snare_hard', 1], ['drum_heavy_kick', 1], ['drum_cymbal_hard', 0.6], ['bd_boom', 0.8]] }
+  { ad: 'HAFİF', g: 0.34, drums: [['drum_snare_soft', 0.8]] },
+  { ad: 'ORTA', g: 0.58, drums: [['drum_snare_hard', 0.75]] },
+  { ad: 'SERT', g: 0.8, x2: 0.6, drums: [['drum_snare_hard', 0.9], ['drum_heavy_kick', 1]] },
+  { ad: 'GÜM!', g: 1.05, x2: 0.85, pm: 1, drums: [['drum_snare_hard', 1], ['drum_heavy_kick', 1], ['drum_cymbal_hard', 0.6], ['bd_boom', 0.8]] }
 ];
 
 function scGraph() {   // kendi çıkış zinciri: seviyeler buna göre ölçüldü, torbanın eski sınırlayıcısından geçmez
@@ -2109,9 +2111,9 @@ function scSmp(n, when, g, dest, pan) {   // davul örneği çal
   if (pan && ac.createStereoPanner) { p = ac.createStereoPanner(); p.pan.value = pan; v.connect(p); p.connect(dest); } else v.connect(dest);
   s.start(when);
 }
-function scGtr(n, when, g, pan) {   // gitar akoru çal; ses düğümünü döndürür (sıradaki yumrukta susturmak için)
+function scGtr(n, when, g, pan, rate) {   // gitar akoru çal; ses düğümünü döndürür (sıradaki yumrukta susturmak için)
   var x = SC.GT[n]; if (!x) return null;
-  var s = ac.createBufferSource(), v = ac.createGain(), p; s.buffer = x.b; v.gain.setValueAtTime(g * x.k, when); s.connect(v);
+  var s = ac.createBufferSource(), v = ac.createGain(), p; s.buffer = x.b; if (rate) s.playbackRate.value = rate; v.gain.setValueAtTime(g * x.k, when); s.connect(v);
   if (pan && ac.createStereoPanner) { p = ac.createStereoPanner(); p.pan.value = pan; v.connect(p); p.connect(SC.gtr); } else v.connect(SC.gtr);
   s.start(when, x.o); return v;
 }
@@ -2148,7 +2150,7 @@ function scPlay(k, ty) {   // k: 0 hafif … 3 çok sert; ty: 'd' düz, 'l'/'r' 
   if (sarki) scSong(at, k);
   else {
     SC.voice.forEach(function (v) { if (v) { v.gain.cancelScheduledValues(at); v.gain.setTargetAtTime(0, at, 0.015); } });   // önceki akor yeni yumrukta susar: gitarist akor değiştirir gibi
-    SC.voice = [scGtr(ak + (T.pm ? 'p' : ''), at, T.g, side), up && !T.pm ? scGtr(ak + 'p', at, T.g * 0.8, 0) : null];   // açık akor sıradaki yumruğa kadar tınlar
+    SC.voice = [scGtr(ak, at, T.g, side), T.x2 ? scGtr(ak, at + 0.014, T.x2, -side * 0.6, 1.006) : null, T.pm || up ? scGtr(ak + 'p', at, T.g * 0.7, 0) : null];   // açık akor sıradaki yumruğa kadar tınlar
   }
   T.drums.forEach(function (d, i) { scSmp(i ? d[0] : side ? 'drum_tom_lo_hard' : up ? 'drum_bass_hard' : d[0], at, d[1] * dg, SC.hit, i ? 0 : side); });
   if (son) scSmp('drum_splash_hard', at, 0.8, SC.hit);   // şarkının son notası: büyük bitiş
