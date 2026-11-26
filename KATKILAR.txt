@@ -11,6 +11,10 @@ Hazir sarki (sarki.m4a):
   https://creativecommons.org/licenses/by/4.0/
   Degisiklik: ilk 9,45 saniye kesildi; mono AAC olarak yeniden kodlandi.
 
+Bas gitar (bas/*.m4a), CC0 (kamu mali):
+  bass D1, D2, G2, A2 by mat_the_glad, https://freesound.org/people/mat_the_glad/
+  Degisiklik: bastaki sessizlik kirpildi, 2 saniyeye kisaltildi, mono AAC olarak yeniden kodlandi.
+
 Davul kayitlari (dvl/*.m4a), ikisi de CC0 (kamu mali):
   "punk-rock groove 140 bpm" by vincent sermonne, https://freesound.org/people/vincent%20sermonne/sounds/423720/
   "Rock Drums 2" by carloseton, https://freesound.org/people/carloseton/sounds/564388/ (17-32. olculer)
