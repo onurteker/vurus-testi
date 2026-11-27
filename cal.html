@@ -54,7 +54,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 </head>
 <body>
 <div class="scr on" id="home">
-  <h1>Vuruş</h1><small class="v">Şarkıyı sen çal · v1.12.0</small>
+  <h1>Vuruş</h1><small class="v">Şarkıyı sen çal · v1.13.0</small>
   <p style="margin-top:16px"><b>Jingle Bells'i yumrukla çal.</b> Her yumruk şarkının sıradaki notası. Sert vurdukça gitar ve davul büyür.</p>
   <div class="box"><b>Kurulum</b><p>1. Telefonu torbanın <b>en üst kısmına</b>, vuruş bölgesinin dışına, ekranı sana bakacak şekilde <b>sıkıca</b> bağla. Torbanın en az sallanan yeri üstüdür. Gevşek kayış yanlış sayar.<br>2. Sesi sonuna kadar aç, sessiz modu kapat.<br>3. BAŞLA'ya bas, sensör iznini ver.</p></div>
   <button id="start" class="big primary">BAŞLA</button>
@@ -81,6 +81,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
     <h2>Seçenekler</h2>
     <div class="row"><span>Süre <small class="v">ilk yumrukla başlar, bitince kendi durur</small></span><span><button id="scSureB"></button></span></div>
     <div class="row"><span>Güç sesi <small class="v">ikisini de dene</small></span><span><button id="scLad"></button></span></div>
+    <div class="row" style="display:block"><span>Sesleri dinle <small class="v">çok hafiften çok serte; dokun, dinle</small></span><div id="scDinle" style="display:flex;gap:8px;margin-top:8px"><button data-k="0" style="flex:1" aria-label="çok hafif">1</button><button data-k="1" style="flex:1" aria-label="hafif">2</button><button data-k="2" style="flex:1" aria-label="orta">3</button><button data-k="3" style="flex:1" aria-label="sert">4</button><button data-k="4" style="flex:1" aria-label="çok sert">5</button></div></div>
     <div class="row" style="display:none"><span>Müzik</span><span><button id="scKay"></button></span></div>
     <div class="row"><span>Arkadaki ritim</span><span><button id="scMode"></button></span></div>
     <div class="row"><span>Gitar tonu</span><span><button id="scPal"></button></span></div>
@@ -92,7 +93,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
     <div class="row"><span>Video klip <small class="v">ön kamera + oyunun sesi</small></span><span><button id="scClip"></button></span></div>
     <div class="row"><span>Mikrofonla ölç <small class="v">yalnız rapora yazar</small></span><span><button id="scMic"></button></span></div>
     <p style="font-size:14px">Mikrofonu Bluetooth hoparlörle birlikte açma: iPhone mikrofon açıkken Bluetooth sesini telefon görüşmesi kalitesine düşürür. Mikrofon denemesini ayrı, kısa bir turda yap.</p>
-    <p style="font-size:14px">Vur: her vuruş bir nota, şarkı senin hızında ilerler. Gücün, çalan sesi seçer. <b>Bateri seti:</b> gitar her vuruşta notayı çalar; çok hafif vuruş hi-hat'e, hafif ve orta vuruş trampete, sert vuruş bas davula vurur, en sertinde zil ve gümbürtü gelir. <b>Grup büyür:</b> çok hafifte bas gitar, hafifte kısık gitar, ortada açık gitar ve trampet, sertte çift gitar ve bateri, en sertte tam kadro çalar. Ekranda her vuruşun gücü, hızın (yumruk/dk) ve en sert vuruşun yazar. Yumruk tanıtma şart değil; yapılırsa (Deneysel) kroşede tom, aparkatta öndeki iki davul, low kick'te gümbürtü çalar.</p>
+    <p style="font-size:14px">Vur: her vuruş bir nota, şarkı senin hızında ilerler. Gücün, çalan sesi seçer; "Sesleri dinle" ile beş kademeyi yumruk atmadan duyabilirsin. <b>Bateri önde:</b> gitar geride notayı taşır; çok hafif vuruş hi-hat'e, hafif vuruş trampete, orta vuruş toma, sert vuruş bas davula vurur, en sertinde zil ve gümbürtü gelir. <b>Gitar önde:</b> çok hafifte bas gitar, hafifte kısık gitar, ortada açık gitar, sertte çift gitar ve bas davul, en sertte tam kadro çalar. Ekranda her vuruşun gücü, hızın (yumruk/dk) ve en sert vuruşun yazar. Yumruk tanıtma şart değil; yapılırsa (Deneysel) kroşede tom, aparkatta öndeki iki davul, low kick'te gümbürtü çalar.</p>
     <p style="font-size:14px">Arkadaki ritim gerçek bir davul kaydıdır ve seni izler: durunca boğulur, vurdukça açılır, ritim gitarı ve bas senin akorunla eşlik eder; sert ya da sık vurunca hızlanır. Notalar ritme oturur. "Yok" seçersen yalnız sen çalarsın ve nota vurduğun an gelir. <small class="v" id="scSnd"></small></p>
     <p style="font-size:12px;color:var(--dim)">Gitar akorları: Ax_Grinder, "Electric Guitar Power Chords" (freesound.org), CC BY 3.0; kısaltıldı ve yeniden kodlandı. Bas gitar: mat_the_glad; davul kayıtları: vincent sermonne ve carloseton (freesound.org, CC0). Davul vuruşları: Sonic Pi (CC0).</p>
   </div>
@@ -171,7 +172,7 @@ ol.lb{margin:8px 0;padding:0;list-style:none}ol.lb li{display:flex;justify-conte
 <script>
 'use strict';
 var $ = function (id) { return document.getElementById(id); };
-var VER = 'cal-1.12.0', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
+var VER = 'cal-1.13.0', LV = ['Kolay', 'Normal', 'Hızlı'], PERF = 90, WIN = 240;
 function pn(n) { return { h: n % 2 ? 'L' : 'R', ty: Math.floor((n - 1) / 2) }; }
 function med(a) { if (!a.length) return 0; var s = a.slice().sort(function (p, q) { return p - q; }); return s[Math.floor(s.length / 2)]; }
 function r1(v) { return Math.round(v * 10) / 10; }
@@ -2061,7 +2062,7 @@ $('yQuit').addEventListener('pointerdown', function (e) { e.preventDefault(); $(
 ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (n) { $('yQuit').addEventListener(n, function () { clearTimeout(yqT); $('yQuit').textContent = 'DURDUR · basılı tut'; }); });
 $('cv15').addEventListener('pointerdown', yTap);
 
-/* ---------- v1.12.0 · Şarkıyı sen çal ----------
+/* ---------- v1.13.0 · Şarkıyı sen çal ----------
    Her yumruk Jingle Bells nakaratının sıradaki notası (YOL_HARITASI.md, çekirdek).
    Nota = gerçek elektro gitar akoru: amfiden kaydedilmiş, her nota için ayrı dosya (gtr/, Ax_Grinder, CC BY 3.0). Perde kaydırma ve yapay amfi yok.
    Güç, çalan sesi seçer (v1.12): iki diziliş var (SCLAD), menüden seçilir. Açık akor çaldığı kademelerde sıradaki yumruğa kadar tınlar.
@@ -2092,23 +2093,24 @@ var SCKEYS = [['Kalın (Re)', { 1: 'D2', 2: 'E2', 3: 'Fs2', 4: 'G2', 5: 'A2' }],
 function scKey() { return SCKEYS[S.sc.pal === 2 ? 1 : 0]; }
 var SCSONG = []; SCL.forEach(function (L, li) { var h = L[1].split(' '); if (h.length !== L[0].length) throw new Error('satır ' + li + ': nota ve hece sayısı tutmuyor'); h.forEach(function (s, i) { SCSONG.push({ d: +L[0][i], s: s, li: li }); }); });
 // Beş güç kademesi, iki diziliş (menüden seçilir, S.sc.lad). 27 Kas, Marte: "hep aynı sesin 5 farklı kademesi gibi bu ve doğal ve yeterince zevkli gelmiyor;
-// aralarında desibel farkı olan farklı sesler olsa ama yine aynı parçayı çalacak şekilde". Güç artık aynı kaydın sesini açıp kısmaz, çalan sesi seçer.
+// aralarında desibel farkı olan farklı sesler olsa ama yine aynı parçayı çalacak şekilde". Güç aynı kaydın sesini açıp kısmaz, çalan sesi seçer.
+// v1.12'de iki diziliş orta ve üstünde aynıydı, her kademede baskın ses de aynı gitardı; Marte: "farkını bile anlamadım". v1.13: her kademede BASKIN ses değişir, iki diziliş her kademede ayrıdır.
 // g = açık akor (sıradaki yumruğa kadar tınlar); x2 = ikinci gitar (aynı akor 14 ms sonra, çok az farklı perdede); pm = aynı akorun susturulmuş hali (kısa, pes darbe); b = bas gitarda kök nota.
 // Darbe davulları [ad, ses]; ilk davul vuruş türüne göre değişir (tür ayrımı açıksa). Davullar gerçekten yumuşak ve sert vurularak alınmış ayrı kayıtlar (Sonic Pi, CC0).
-// Seviyeler test/olc_cal.py ile ölçülerek ayarlandı: iki dizilişte de kademeler sırayla büyür.
+// Seviyeler ve kademeler arası ses farkı test/olc_cal.py ile ölçülerek ayarlandı.
 var SCLAD = [
-  ['Bateri seti', [   // gitar her yumrukta notayı çalar; güç baterinin hangi parçasına vurulduğunu seçer
-    { ad: 'ÇOK HAFİF', g: 0.38, pm: 0.3, b: 0.3, drums: [['drum_cymbal_closed', 0.9]] },
-    { ad: 'HAFİF', g: 0.46, pm: 0.4, b: 0.4, drums: [['drum_snare_soft', 1]] },
-    { ad: 'ORTA', g: 0.56, pm: 0.55, b: 0.55, drums: [['drum_snare_hard', 0.9]] },
-    { ad: 'SERT', g: 0.72, x2: 0.5, pm: 0.75, b: 0.75, drums: [['drum_snare_hard', 0.9], ['drum_heavy_kick', 1]] },
-    { ad: 'GÜM!', g: 0.92, x2: 0.8, pm: 1, b: 0.95, drums: [['drum_snare_hard', 1], ['drum_heavy_kick', 1], ['drum_cymbal_hard', 0.7], ['bd_boom', 0.8]] }]],
-  ['Grup büyür', [   // güç notayı kimin çaldığını seçer: bas gitar, kısık gitar, açık gitar ve trampet, çift gitar ve bateri, tam kadro
+  ['Bateri önde', [   // gitar geride ve sabit, yalnız notayı taşır; öndeki ses her kademede baterinin başka bir parçası: hi-hat, trampet, tom, bas davul, zil ve gümbürtü
+    { ad: 'ÇOK HAFİF', g: 0.26, pm: 0, b: 0.26, drums: [['drum_cymbal_closed', 2]] },
+    { ad: 'HAFİF', g: 0.26, pm: 0, b: 0.26, drums: [['drum_snare_soft', 2.2]] },
+    { ad: 'ORTA', g: 0.26, pm: 0, b: 0.26, drums: [['drum_tom_lo_hard', 0.95]] },
+    { ad: 'SERT', g: 0.26, pm: 0, b: 0.26, drums: [['drum_heavy_kick', 2.6], ['drum_snare_hard', 1.5]] },
+    { ad: 'GÜM!', g: 0.26, pm: 0, b: 0.26, drums: [['drum_cymbal_hard', 1.3], ['drum_heavy_kick', 2.6], ['bd_boom', 1.6], ['drum_splash_hard', 1]] }]],
+  ['Gitar önde', [   // güç notayı kimin, nasıl çaldığını seçer: bas gitar, susturulmuş gitar, açık gitar, çift gitar ve bas davul, tam kadro
     { ad: 'ÇOK HAFİF', g: 0, pm: 0, b: 0.55, drums: [['drum_cymbal_closed', 0.6]] },
     { ad: 'HAFİF', g: 0, pm: 0.7, b: 0.4, drums: [] },
-    { ad: 'ORTA', g: 0.6, pm: 0.5, b: 0.6, drums: [['drum_snare_hard', 0.85]] },
-    { ad: 'SERT', g: 0.75, x2: 0.6, pm: 0.8, b: 0.8, drums: [['drum_snare_hard', 0.9], ['drum_heavy_kick', 1]] },
-    { ad: 'GÜM!', g: 0.95, x2: 0.85, pm: 1, b: 1, drums: [['drum_snare_hard', 1], ['drum_heavy_kick', 1], ['drum_cymbal_hard', 0.7], ['bd_boom', 0.8]] }]]
+    { ad: 'ORTA', g: 0.76, pm: 0, b: 0.55, drums: [] },
+    { ad: 'SERT', g: 0.8, x2: 0.62, pm: 0.9, b: 0.8, drums: [['drum_heavy_kick', 2]] },
+    { ad: 'GÜM!', g: 0.95, x2: 0.85, pm: 1, b: 1, drums: [['drum_snare_hard', 1], ['drum_heavy_kick', 1.2], ['drum_cymbal_hard', 0.7], ['bd_boom', 0.8]] }]]
 ];
 function scLad() { return SCLAD[S.sc.lad === 1 ? 1 : 0]; }
 
@@ -2214,6 +2216,23 @@ function scSong(at, k) {
   Z.g.gain.setTargetAtTime([0.45, 0.55, 0.72, 0.88, 1][k], at + 0.0005, 0.008);
   Z.until = at + SC.FUEL; Z.g.gain.setTargetAtTime(0, Z.until, 0.03);
 }
+function scTel(T, ak, at, side, up, kick, kg) {   // gitar ve bas: önceki akor susar, bu kademenin sesi çalar
+  SC.voice.forEach(function (v) { if (v) { v.gain.cancelScheduledValues(at); v.gain.setTargetAtTime(0, at, 0.015); } });   // önceki akor yeni yumrukta susar: gitarist akor değiştirir gibi
+  SC.voice = [T.g ? scGtr(ak, at, T.g * kg, side) : null, T.x2 || (kick && T.g) ? scGtr(ak, at + 0.014, (T.x2 || T.g * 0.9) * kg, -side * 0.6, 1.006) : null,   // açık akor sıradaki yumruğa kadar tınlar
+    T.pm ? scGtr(ak + 'p', at, T.pm * 0.6 * (up || kick ? 1.4 : 1), 0) : null];
+  scBas(ak, at, T.b * kg, 0.7);
+}
+function scDavul(T, at, side, up, kick, dg) {   // darbe davulları; tür ayrımı açıksa ilk davulun yerine türün davulu çalar (kroşe tom, low kick bas davul)
+  var tk = [1, 1.3, 1.6, 2, 2.4][scLad()[1].indexOf(T)] || 1.6;   // türün davulu kademeyle büyür: dizilişteki ilk davulun kendi sesi sırayla büyümez (v1.13 ölçümü: low kick -10,8 / -10,0 / -14,6 dB)
+  T.drums.forEach(function (d, i) { var tur = !i && (side || up || kick); scSmp(tur ? (side ? 'drum_tom_lo_hard' : 'drum_bass_hard') : d[0], at, (tur ? tk : d[1]) * dg, SC.hit, i ? 0 : side); });
+}
+function scDinle(k) {   // menüden bir kademenin sesini dinle: yumruk atmadan, seçili diziliş ve tonla (27 Kas, Marte: "farkını bile anlamadım")
+  initAudio(); scLoad(); if (scEksik().length) { smpLoad(); toast('Sesler iniyor; birkaç saniye sonra yeniden dokun.'); return; }
+  scGraph(); var T = scLad()[1][k], ak = scKey()[1][3], at = ac.currentTime + 0.03;
+  scTel(T, ak, at, 0, false, false, 1); scDavul(T, at, 0, false, false, 1);
+  SC.voice.forEach(function (v) { if (v) v.gain.setTargetAtTime(0, at + 1.5, 0.12); });   // dinlemede akor 1,5 saniye sonra söner
+  toast(scLad()[0] + ' · ' + T.ad);
+}
 function scPlay(k, ty, puan) {   // k: 0 çok hafif … 4 çok sert; ty: 'd' düz, 'l'/'r' kroşe, 'u' aparkat, 'k' low kick, yoksa düz gibi
   var G = SC.G; if (!G || G.done) return;
   var sarki = S.sc.kay === 1, kick = ty === 'k', at = scTime(), n = SCSONG[G.pos], son = !sarki && G.pos === SCSONG.length - 1, T = scLad()[1][son ? 4 : k], ak = scKey()[1][n.d];
@@ -2228,13 +2247,10 @@ function scPlay(k, ty, puan) {   // k: 0 çok hafif … 4 çok sert; ty: 'd' dü
   }
   if (sarki) scSong(at, k);
   else {
-    SC.voice.forEach(function (v) { if (v) { v.gain.cancelScheduledValues(at); v.gain.setTargetAtTime(0, at, 0.015); } });   // önceki akor yeni yumrukta susar: gitarist akor değiştirir gibi
-    SC.voice = [T.g ? scGtr(ak, at, T.g * kg, side) : null, T.x2 || (kick && T.g) ? scGtr(ak, at + 0.014, (T.x2 || T.g * 0.9) * kg, -side * 0.6, 1.006) : null,   // açık akor sıradaki yumruğa kadar tınlar
-      T.pm ? scGtr(ak + 'p', at, T.pm * 0.6 * (up || kick ? 1.4 : 1), 0) : null];
-    scBas(ak, at, T.b * kg, 0.7);
+    scTel(T, ak, at, side, up, kick, kg);
     SC.root = ak; SC.last = at; SC.hits.push([at, kick ? Math.min(4, k + 1) : k]);   // ritim bölümü bu akoru ve bu yoğunluğu izler
   }
-  T.drums.forEach(function (d, i) { scSmp(i ? d[0] : side ? 'drum_tom_lo_hard' : up || kick ? 'drum_bass_hard' : d[0], at, d[1] * dg, SC.hit, i ? 0 : side); });
+  scDavul(T, at, side, up, kick, dg);
   if (kick) { scSmp('bd_boom', at, 0.35 + 0.13 * k, SC.hit); scSmp('drum_splash_hard', at, 0.3 + 0.12 * k, SC.hit); }
   if (son) scSmp('drum_splash_hard', at, 0.8, SC.hit);   // şarkının son notası: büyük bitiş
   if (scA()) { var b = SC.duck.gain; b.cancelScheduledValues(at); b.setValueAtTime([0.6, 0.55, 0.5, 0.42, 0.35][son ? 4 : k], at); b.linearRampToValueAtTime(1, at + 0.16); }   // davul bir an geri çekilir, sert vuruşta daha çok
@@ -2245,7 +2261,7 @@ function scPlay(k, ty, puan) {   // k: 0 çok hafif … 4 çok sert; ty: 'd' dü
 function scHit(h) {   // torbadaki telefon: karar ilk 35 ms'de (3 örnek); 80 ms'deki şiddet rapora yazılır
   var G = SC.G; if (!G || G.done) return;
   h.e = function () {
-    var s2 = Math.max.apply(null, h.v), a = G.s2.slice(-16), ref = a.length >= 4 ? med(a) : Math.max(8, (S.light || 8) * 1.4), x = s2 / ref, k = x < 0.45 ? 0 : x < 0.8 ? 1 : x < 1.3 ? 2 : x < 1.9 ? 3 : 4, c = yClass(h);
+    var s2 = Math.max.apply(null, h.v), a = G.s2.slice(-16), ref = a.length >= 4 ? med(a) : Math.max(8, (S.light || 8) * 1.4), x = s2 / ref, k = x < 0.6 ? 0 : x < 0.85 ? 1 : x < 1.15 ? 2 : x < 1.5 ? 3 : 4, c = yClass(h);
     // "Çok hafif" yeni bir algılama eşiği değildir: neyin vuruş sayılacağına hâlâ torba ayarı ve sallantı korumaları karar verir (onMotion); burada yalnız algılanmış vuruş sınıflanır.
     // satır sonundaki 6 sayı ham yön özelliğidir (itiş x y z + dönüş x y z): tür ayrımını sonradan çözümlemek ve eğitmek için. Mikrofon açıksa en sona [fark ms, ses, zemin] eklenir.
     var row = [Math.round(h.t - G.tp0), r1(s2), c.ty || '-', Math.round(c.m * 100), k + 1, 0].concat(yFeat(h).map(function (v) { return Math.round(v * 100) / 100; }));
@@ -2346,6 +2362,7 @@ $('scTy').addEventListener('click', function () { if (!V.cent) { toast('Önce "Y
   if (!V.tyOn && !scTyOk()) { toast('Tanıtma %' + V.acc + ': türler ayrışmıyor. Telefonu sıkı bağlayıp tanıtmayı tekrarla.'); return; }
   V.tyOn = V.tyOn ? 0 : 1; save(); scMenuText(); });
 $('scLB').addEventListener('click', latStart);
+$('scDinle').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) scDinle(+b.getAttribute('data-k')); });
 $('scLad').addEventListener('click', function () { S.sc.lad = S.sc.lad === 1 ? 0 : 1; save(); scMenuText(); });
 $('scSureB').addEventListener('click', function () { S.sc.sure = SCSURE[(SCSURE.indexOf(S.sc.sure || 0) + 1) % SCSURE.length]; save(); scMenuText(); });
 $('scHiz').addEventListener('click', function () { S.sc.hiz = S.sc.hiz === 0 ? 1 : 0; save(); scMenuText(); });
